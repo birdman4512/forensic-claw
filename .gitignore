@@ -6,6 +6,7 @@
 # Runtime data created by the gateway / agent
 config/
 logs/
+workspace/.openclaw/
 
 # Case data (often sensitive: evidence, findings, credentials in worklogs).
 # Templates and the EXAMPLE-001 skeleton are tracked; real cases are not.
