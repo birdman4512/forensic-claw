@@ -34,7 +34,7 @@ Inside each tool container the case root appears at `/cases`, so args use tool-c
 | `OPENCLAW_CASES_HOST_PATH` (→ `FORENSIC_CLAW_CASES_HOST_DIR`) | _(unset)_ | **yes** for the four containerized wrappers |
 | `FORENSIC_CLAW_PLASO_IMAGE` | `log2timeline/plaso:latest` | no |
 | `FORENSIC_CLAW_NUCLEI_IMAGE` | `projectdiscovery/nuclei:latest` | no |
-| `FORENSIC_CLAW_VOL2_IMAGE` | _(unset)_ | yes if you use vol2 |
-| `FORENSIC_CLAW_MEMPROCFS_IMAGE` | _(unset)_ | yes if you use memprocfs |
+| `FORENSIC_CLAW_VOL2_IMAGE` | `blacktop/volatility:2.6` | no |
+| `FORENSIC_CLAW_MEMPROCFS_IMAGE` | `forensic-claw-memprocfs:latest` (build locally — see [`tools-images/memprocfs/`](../../tools-images/memprocfs/)) | yes (build first) |
 
 Do not store secrets or live case evidence in this workspace. Store evidence, outputs, and worklogs in the case folder.

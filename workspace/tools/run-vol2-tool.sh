@@ -1,33 +1,24 @@
 #!/usr/bin/env bash
 # Volatility 2 wrapper.
-# Spawns an ephemeral container from FORENSIC_CLAW_VOL2_IMAGE and runs `vol2`
-# inside it. There is no canonical upstream vol2 image - you must point
-# FORENSIC_CLAW_VOL2_IMAGE at a community image you trust or one you build
-# locally.
+# Spawns an ephemeral container from FORENSIC_CLAW_VOL2_IMAGE and passes
+# args straight through to the image's entrypoint (typically vol.py).
+# Default image: blacktop/volatility:2.6 (community-maintained on Docker Hub).
 #
 # Requires: /var/run/docker.sock mounted into the gateway, and
 # FORENSIC_CLAW_CASES_HOST_DIR set to the absolute host path of cases/.
 
 set -uo pipefail
 
-IMAGE="${FORENSIC_CLAW_VOL2_IMAGE:-}"
+IMAGE="${FORENSIC_CLAW_VOL2_IMAGE:-blacktop/volatility:2.6}"
 CASES_HOST_DIR="${FORENSIC_CLAW_CASES_HOST_DIR:-}"
 LOG_DIR="${FORENSIC_CLAW_LOG_DIR:-/home/node/.openclaw/logs}"
 LOG_FILE="$LOG_DIR/tool-command-history.md"
-
-if [ -z "$IMAGE" ]; then
-  echo "error: FORENSIC_CLAW_VOL2_IMAGE is not set." >&2
-  echo "       Set it in .env to a Volatility 2 docker image (e.g. one you build locally)." >&2
-  exit 2
-fi
 
 if [ -z "$CASES_HOST_DIR" ]; then
   echo "error: FORENSIC_CLAW_CASES_HOST_DIR is not set." >&2
   echo "       Set OPENCLAW_CASES_HOST_PATH in .env to the absolute host path of ./cases" >&2
   exit 2
 fi
-
-if [ "${1:-}" = "vol2" ]; then shift; fi
 
 mkdir -p "$LOG_DIR"
 
@@ -38,7 +29,7 @@ docker run --rm -i \
   --network bridge \
   -v "$CASES_HOST_DIR:/cases" \
   -w /cases \
-  "$IMAGE" vol2 "$@"
+  "$IMAGE" "$@"
 rc=$?
 
 printf -- '- %s  cwd=%s  image=%s  `vol2 %s`  exit=%d\n' "$ts" "$cwd" "$IMAGE" "$*" "$rc" >> "$LOG_FILE"

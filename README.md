@@ -130,13 +130,21 @@ docker compose run --rm openclaw-cli onboard
 
 ## Containerized tool wrappers (plaso, vol2, memprocfs, nuclei)
 
-These four tools live in upstream Docker images and run via wrappers in `workspace/tools/`. They share the host docker socket, which is wired up automatically in `docker-compose.yml`. To use them you need to set:
+These four tools run via wrappers in `workspace/tools/` that shell out to Docker images. They share the host docker socket (wired up in `docker-compose.yml`). To use them you need to set:
 
 - `OPENCLAW_CASES_HOST_PATH` — absolute host path of `./cases` (used to bind-mount cases into each tool container).
 - `DOCKER_GID` — group id that owns `/var/run/docker.sock` on your host.
-- `FORENSIC_CLAW_VOL2_IMAGE` and `FORENSIC_CLAW_MEMPROCFS_IMAGE` — only required if you actually use those two tools (no canonical upstream image exists; build your own or point at a community image you trust).
 
-Plaso (`log2timeline/plaso:latest`) and Nuclei (`projectdiscovery/nuclei:latest`) work out of the box — first invocation will pull the image (~1–2 minutes), subsequent runs are instant.
+Default images (overridable via `FORENSIC_CLAW_*_IMAGE` env vars):
+
+| Tool | Image | Source |
+|---|---|---|
+| Plaso | `log2timeline/plaso:latest` | Pulled from Docker Hub on first use |
+| Vol2 | `blacktop/volatility:2.6` | Pulled from Docker Hub on first use |
+| Nuclei | `projectdiscovery/nuclei:latest` | Pulled from Docker Hub on first use |
+| MemProcFS | `forensic-claw-memprocfs:latest` | **Build locally first** — `docker build -t forensic-claw-memprocfs:latest tools-images/memprocfs/` |
+
+See [`tools-images/README.md`](tools-images/README.md) for details on the MemProcFS build (and how to bump the version).
 
 ## Troubleshooting
 

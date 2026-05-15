@@ -28,10 +28,12 @@ tools/run-forensic-tool.sh vol -f /home/node/.openclaw/cases/CASE-001/evidence/m
 
 | Wrapper | Default image | Required env |
 |---|---|---|
-| `tools/run-plaso-tool.sh <tool> [args...]` | `log2timeline/plaso:latest` | `OPENCLAW_CASES_HOST_PATH` |
-| `tools/run-vol2-tool.sh [args...]` | _(set `FORENSIC_CLAW_VOL2_IMAGE`)_ | `OPENCLAW_CASES_HOST_PATH`, `FORENSIC_CLAW_VOL2_IMAGE` |
-| `tools/run-memprocfs-tool.sh [args...]` | _(set `FORENSIC_CLAW_MEMPROCFS_IMAGE`)_ | `OPENCLAW_CASES_HOST_PATH`, `FORENSIC_CLAW_MEMPROCFS_IMAGE` |
-| `tools/run-nuclei-tool.sh [args...]` | `projectdiscovery/nuclei:latest` | `OPENCLAW_CASES_HOST_PATH` |
+| `tools/run-plaso-tool.sh <tool> [args...]` | `log2timeline/plaso:latest` (upstream) | `OPENCLAW_CASES_HOST_PATH` |
+| `tools/run-vol2-tool.sh [args...]` | `blacktop/volatility:2.6` (community) | `OPENCLAW_CASES_HOST_PATH` |
+| `tools/run-memprocfs-tool.sh [args...]` | `forensic-claw-memprocfs:latest` (build locally from `tools-images/memprocfs/`) | `OPENCLAW_CASES_HOST_PATH` |
+| `tools/run-nuclei-tool.sh [args...]` | `projectdiscovery/nuclei:latest` (upstream) | `OPENCLAW_CASES_HOST_PATH` |
+
+Plaso, vol2, and nuclei images pull on first use. MemProcFS has no upstream image — build it locally first: `docker build -t forensic-claw-memprocfs:latest tools-images/memprocfs/`.
 
 Inside each tool container the case root is mounted at `/cases`, so args use **tool-container paths**:
 

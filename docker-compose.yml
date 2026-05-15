@@ -66,8 +66,8 @@ services:
 
       # Upstream tool images consumed by the wrappers (overridable per-host).
       FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
-      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-}
-      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-}
+      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-blacktop/volatility:2.6}
+      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-forensic-claw-memprocfs:latest}
       FORENSIC_CLAW_NUCLEI_IMAGE: ${FORENSIC_CLAW_NUCLEI_IMAGE:-projectdiscovery/nuclei:latest}
 
     volumes:
@@ -160,8 +160,8 @@ services:
       FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
       FORENSIC_CLAW_LOGS_HOST_DIR: ${OPENCLAW_LOGS_HOST_PATH:-}
       FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
-      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-}
-      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-}
+      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-blacktop/volatility:2.6}
+      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-forensic-claw-memprocfs:latest}
       FORENSIC_CLAW_NUCLEI_IMAGE: ${FORENSIC_CLAW_NUCLEI_IMAGE:-projectdiscovery/nuclei:latest}
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-./config}:/home/node/.openclaw

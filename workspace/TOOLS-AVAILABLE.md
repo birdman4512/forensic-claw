@@ -44,12 +44,18 @@ Provided by the project [Dockerfile](../../Dockerfile):
 
 | Tool | Wrapper | Default image | Configurable via |
 |---|---|---|---|
-| Plaso (log2timeline / psort) | `tools/run-plaso-tool.sh` | `log2timeline/plaso:latest` | `FORENSIC_CLAW_PLASO_IMAGE` |
-| Volatility 2 | `tools/run-vol2-tool.sh` | _(none — must be set)_ | `FORENSIC_CLAW_VOL2_IMAGE` |
-| MemProcFS | `tools/run-memprocfs-tool.sh` | _(none — must be set)_ | `FORENSIC_CLAW_MEMPROCFS_IMAGE` |
-| Nuclei | `tools/run-nuclei-tool.sh` | `projectdiscovery/nuclei:latest` | `FORENSIC_CLAW_NUCLEI_IMAGE` |
+| Plaso (log2timeline / psort) | `tools/run-plaso-tool.sh` | `log2timeline/plaso:latest` (upstream) | `FORENSIC_CLAW_PLASO_IMAGE` |
+| Volatility 2 | `tools/run-vol2-tool.sh` | `blacktop/volatility:2.6` (community) | `FORENSIC_CLAW_VOL2_IMAGE` |
+| MemProcFS | `tools/run-memprocfs-tool.sh` | `forensic-claw-memprocfs:latest` (built locally — see [`tools-images/memprocfs/`](../../tools-images/memprocfs/)) | `FORENSIC_CLAW_MEMPROCFS_IMAGE` |
+| Nuclei | `tools/run-nuclei-tool.sh` | `projectdiscovery/nuclei:latest` (upstream) | `FORENSIC_CLAW_NUCLEI_IMAGE` |
 
-vol2 and MemProcFS have no canonical upstream image; the wrappers refuse to run if the matching image env var is unset. Set them in `.env`.
+Plaso, Vol2 and Nuclei pull their images from Docker Hub on first use. MemProcFS has no upstream image — build it locally before first use:
+
+```bash
+docker build -t forensic-claw-memprocfs:latest tools-images/memprocfs/
+```
+
+The MemProcFS wrapper also adds `--cap-add SYS_ADMIN` and `--device /dev/fuse` per invocation so the FUSE mount mode works without granting those caps to the gateway itself.
 
 ## Skills
 
