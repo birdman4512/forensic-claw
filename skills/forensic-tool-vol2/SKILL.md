@@ -5,13 +5,15 @@ description: Use vol2 in Forensic Claw for lawful DFIR, cyber security, evidence
 
 # forensic-tool-vol2
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs an upstream Volatility 2 image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
-tools/run-vol2-tool.sh  [args...]
+tools/run-vol2-tool.sh [args...]
 ```
 
-Use Volatility 2 wrapper. Example: `tools/run-vol2-tool.sh -f mem.raw imageinfo`; then supply the correct `--profile` for plugins.
+Inside the tool container the case root is mounted at `/cases`, so reference evidence as `/cases/<case-id>/evidence/...`. Example: `tools/run-vol2-tool.sh -f /cases/<case-id>/evidence/mem.raw imageinfo`; then supply the correct `--profile` for plugins.
+
+Requires `FORENSIC_CLAW_VOL2_IMAGE` to be set in `.env` (no canonical upstream image). The wrapper refuses to run with a clear error if it's unset.
 
 ## Case discipline
 

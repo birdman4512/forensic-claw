@@ -5,13 +5,15 @@ description: Use memprocfs in Forensic Claw for lawful DFIR, cyber security, evi
 
 # forensic-tool-memprocfs
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs an upstream MemProcFS image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
-tools/run-forensic-tool.sh memprocfs [args...]
+tools/run-memprocfs-tool.sh [args...]
 ```
 
-Currently not genuinely available in the preserved core image; verify before relying on it. If missing, say so and use Volatility instead.
+Inside the tool container the case root is mounted at `/cases`, so reference evidence as `/cases/<case-id>/evidence/...`.
+
+Requires `FORENSIC_CLAW_MEMPROCFS_IMAGE` to be set in `.env` (no canonical upstream image; build locally or point at a community image you trust). If the env var is unset the wrapper refuses to run with a clear error - in that case, say so and use Volatility instead.
 
 ## Case discipline
 

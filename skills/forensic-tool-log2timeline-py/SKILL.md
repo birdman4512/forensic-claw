@@ -5,13 +5,13 @@ description: Use log2timeline.py in Forensic Claw for lawful DFIR, cyber securit
 
 # forensic-tool-log2timeline.py
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs the upstream `log2timeline/plaso` image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-plaso-tool.sh log2timeline.py [args...]
 ```
 
-Use Plaso wrapper. Example: `tools/run-plaso-tool.sh log2timeline.py /home/node/.openclaw/cases/<case-id>/outputs/timeline.plaso /home/node/.openclaw/cases/<case-id>/evidence/source`.
+Inside the tool container the case root is mounted at `/cases`, so use tool-container paths in args: `tools/run-plaso-tool.sh log2timeline.py /cases/<case-id>/outputs/timeline.plaso /cases/<case-id>/evidence/source`.
 
 ## Case discipline
 

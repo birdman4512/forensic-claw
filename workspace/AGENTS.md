@@ -53,9 +53,15 @@ See `CASE-OPERATIONS.md` for the required case structure and status fields.
 ## Tooling
 
 - Consult `TOOLS-AVAILABLE.md` before assuming a forensic tool is unavailable.
-- For heavyweight DFIR tools, use the wrapper:
-  - `tools/run-forensic-tool.sh <tool> [args...]`
-- The wrapper runs the tool directly inside the gateway container (no docker socket, no sub-container) and auto-logs every invocation (timestamp + cwd + command + exit code) to `/home/node/.openclaw/logs/tool-command-history.md` (host: `${OPENCLAW_LOGS_DIR:-./logs}/tool-command-history.md`).
+- For most DFIR tools (in-image), use the generic wrapper:
+  - `tools/run-forensic-tool.sh <tool> [args...]` — runs in the gateway container, no socket needed.
+- For tools that live in upstream Docker images (plaso, vol2, memprocfs, nuclei), use the dedicated wrappers; they shell out via the host docker socket:
+  - `tools/run-plaso-tool.sh <log2timeline.py|psort.py> [args...]`
+  - `tools/run-vol2-tool.sh [args...]`
+  - `tools/run-memprocfs-tool.sh [args...]`
+  - `tools/run-nuclei-tool.sh [args...]`
+- All wrappers auto-log every invocation (timestamp + cwd + image + command + exit code) to `/home/node/.openclaw/logs/tool-command-history.md` (host: `${OPENCLAW_LOGS_DIR:-./logs}/tool-command-history.md`).
+- Inside the tool sub-containers, the case root is mounted at `/cases`, so use `/cases/<case-id>/...` in args. For in-image tools, use the gateway path `/home/node/.openclaw/cases/<case-id>/...`.
 - Save tool outputs under the active case `outputs/` folder where possible.
 - Keep `TOOLS-AVAILABLE.md`, `tools/USAGE.md`, and relevant skills up to date when tooling or workflow changes.
 - For notable runs, also append a richer entry (scope/authorization, output files, result summary, follow-up) to the active case `notes/worklog.md`. Record failures too.

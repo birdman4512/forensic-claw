@@ -56,6 +56,20 @@ services:
       FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
       FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
 
+      # Host paths used by the docker-in-docker wrappers (plaso/vol2/memprocfs/
+      # nuclei). These MUST be host-side absolute paths because the docker
+      # daemon resolves bind-mounts against the host filesystem, not against
+      # the gateway container. Set OPENCLAW_CASES_HOST_PATH and
+      # OPENCLAW_LOGS_HOST_PATH in .env.
+      FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
+      FORENSIC_CLAW_LOGS_HOST_DIR: ${OPENCLAW_LOGS_HOST_PATH:-}
+
+      # Upstream tool images consumed by the wrappers (overridable per-host).
+      FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
+      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-}
+      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-}
+      FORENSIC_CLAW_NUCLEI_IMAGE: ${FORENSIC_CLAW_NUCLEI_IMAGE:-projectdiscovery/nuclei:latest}
+
     volumes:
       # Core OpenClaw config & session data
       - ${OPENCLAW_CONFIG_DIR:-./config}:/home/node/.openclaw
@@ -72,17 +86,14 @@ services:
       # Forensic Claw tool-command history log (auto-written by run-forensic-tool.sh)
       - ${OPENCLAW_LOGS_DIR:-./logs}:/home/node/.openclaw/logs
 
-      # ------------------------------------------------------------------
-      # Sub-agent sandbox (Docker-in-Docker)
-      # Uncomment these three lines and set OPENCLAW_SANDBOX=1 in .env
-      # to allow the gateway to spawn isolated sub-agent containers.
-      # Run: stat -c '%g' /var/run/docker.sock  to get DOCKER_GID (Linux).
-      # ------------------------------------------------------------------
-      # - /var/run/docker.sock:/var/run/docker.sock
+      # Docker socket for the in-image wrappers that shell out to upstream
+      # tool images (plaso, vol2, memprocfs, nuclei). Required for those four
+      # wrappers; the rest of the toolchain runs in-process and ignores it.
+      - /var/run/docker.sock:/var/run/docker.sock
 
-    # Uncomment when sandbox is enabled (adds node user to the docker group)
-    # group_add:
-    #   - "${DOCKER_GID:-999}"
+    # Adds the node user to the docker group so it can read the socket above.
+    group_add:
+      - "${DOCKER_GID:-999}"
 
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"   # Web UI / API
@@ -146,12 +157,21 @@ services:
 
       FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
       FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
+      FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
+      FORENSIC_CLAW_LOGS_HOST_DIR: ${OPENCLAW_LOGS_HOST_PATH:-}
+      FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
+      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-}
+      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-}
+      FORENSIC_CLAW_NUCLEI_IMAGE: ${FORENSIC_CLAW_NUCLEI_IMAGE:-projectdiscovery/nuclei:latest}
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-./config}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR:-./workspace}:/home/node/.openclaw/workspace
       - ${OPENCLAW_SKILLS_DIR:-./skills}:/home/node/.openclaw/skills
       - ${OPENCLAW_CASES_DIR:-./cases}:/home/node/.openclaw/cases
       - ${OPENCLAW_LOGS_DIR:-./logs}:/home/node/.openclaw/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
     stdin_open: true
     tty: true
     init: true

@@ -25,7 +25,7 @@ Copy the env template and open it in your editor:
 cp .env.example .env
 ```
 
-Fill in the keys for whichever provider you'll use:
+Fill in the keys for whichever provider you'll use, plus the host-path setting for the containerized tools:
 
 ```dotenv
 # Pick one (or both)
@@ -35,6 +35,16 @@ OPENAI_API_KEY=sk-...
 # Generate a token to protect the dashboard
 OPENCLAW_GATEWAY_TOKEN=          # run: openssl rand -hex 32
 
+# Absolute host path of ./cases (REQUIRED for plaso/vol2/memprocfs/nuclei wrappers).
+# Linux/macOS:   /home/you/forensic-claw/cases
+# Windows:       C:/Users/you/forensic-claw/cases
+OPENCLAW_CASES_HOST_PATH=
+
+# Docker socket group id (so the gateway can read /var/run/docker.sock).
+# Linux:                 stat -c '%g' /var/run/docker.sock
+# Docker Desktop:        usually 0
+DOCKER_GID=999
+
 # (optional) change the timezone if you're not in Brisbane
 OPENCLAW_TZ=Australia/Brisbane
 ```
@@ -43,7 +53,7 @@ The other variables in `.env.example` have sensible defaults — leave them alon
 
 ### 3. Build the image
 
-This installs the forensic toolchain (tshark, exiftool, volatility3, plaso, yara, …) into a custom Docker image. Takes 5–15 minutes the first time.
+This installs the forensic toolchain (tshark, exiftool, volatility3, yara, sleuthkit, …) into a custom Docker image. Takes 3–8 minutes the first time. Heavy tools that have good upstream Docker images (plaso, vol2, memprocfs, nuclei) are *not* baked in — they're pulled on demand by their wrapper scripts.
 
 ```bash
 docker compose build
@@ -118,10 +128,22 @@ docker compose run --rm openclaw-cli onboard
 
 `./config/` and `./cases/` hold your real work — back them up. Everything else is reproducible from this repo.
 
+## Containerized tool wrappers (plaso, vol2, memprocfs, nuclei)
+
+These four tools live in upstream Docker images and run via wrappers in `workspace/tools/`. They share the host docker socket, which is wired up automatically in `docker-compose.yml`. To use them you need to set:
+
+- `OPENCLAW_CASES_HOST_PATH` — absolute host path of `./cases` (used to bind-mount cases into each tool container).
+- `DOCKER_GID` — group id that owns `/var/run/docker.sock` on your host.
+- `FORENSIC_CLAW_VOL2_IMAGE` and `FORENSIC_CLAW_MEMPROCFS_IMAGE` — only required if you actually use those two tools (no canonical upstream image exists; build your own or point at a community image you trust).
+
+Plaso (`log2timeline/plaso:latest`) and Nuclei (`projectdiscovery/nuclei:latest`) work out of the box — first invocation will pull the image (~1–2 minutes), subsequent runs are instant.
+
 ## Troubleshooting
 
-- **Build fails on `pip install plaso`** — Plaso pulls in a long native dependency chain. If the build OOMs, give Docker Desktop more memory (Settings → Resources → at least 4 GB).
 - **Dashboard won't load** — confirm the gateway is running with `docker compose ps` and check `docker compose logs -f openclaw-gateway` for errors.
 - **"Token required" loop** — get a fresh launch URL with `docker compose run --rm openclaw-cli dashboard --no-open`.
+- **`tools/run-plaso-tool.sh` fails with "Cannot connect to the Docker daemon"** — `/var/run/docker.sock` isn't accessible from inside the gateway container. Check that `DOCKER_GID` in `.env` matches `stat -c '%g' /var/run/docker.sock` on the host, then `docker compose up -d --force-recreate openclaw-gateway`.
+- **`tools/run-plaso-tool.sh` fails with "FORENSIC_CLAW_CASES_HOST_DIR is not set"** — set `OPENCLAW_CASES_HOST_PATH` in `.env` to the absolute host path of `./cases` and recreate the gateway container.
+- **`tools/run-vol2-tool.sh` or `run-memprocfs-tool.sh` fails with "FORENSIC_CLAW_*_IMAGE is not set"** — these tools have no default image. Set the matching env var to a Docker image you've built or trust.
 - **Want a different timezone in logs/timestamps** — set `OPENCLAW_TZ` in `.env` (uses standard tz database names like `America/New_York`) and `docker compose restart openclaw-gateway`.
 - **Changed `.env` and nothing happened** — env changes only apply on container start. Run `docker compose up -d --force-recreate openclaw-gateway`.

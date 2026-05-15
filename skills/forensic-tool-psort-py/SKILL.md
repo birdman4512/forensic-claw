@@ -5,13 +5,13 @@ description: Use psort.py in Forensic Claw for lawful DFIR, cyber security, evid
 
 # forensic-tool-psort.py
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs the upstream `log2timeline/plaso` image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-plaso-tool.sh psort.py [args...]
 ```
 
-Use after `log2timeline.py`. Example: `tools/run-plaso-tool.sh psort.py -o l2tcsv -w /home/node/.openclaw/cases/<case-id>/outputs/timeline.csv /home/node/.openclaw/cases/<case-id>/outputs/timeline.plaso`.
+Inside the tool container the case root is mounted at `/cases`, so use tool-container paths in args. Use after `log2timeline.py`: `tools/run-plaso-tool.sh psort.py -o l2tcsv -w /cases/<case-id>/outputs/timeline.csv /cases/<case-id>/outputs/timeline.plaso`.
 
 ## Case discipline
 

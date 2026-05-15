@@ -101,23 +101,27 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     dnstwist \
     httpx \
     openai \
-    plaso \
     pyshark \
     requests \
     volatility3 \
     yq
 
 # -----------------------------------------------------------------------------
-# Stubs for tools not available in this image (keep paths invocable).
+# Docker CLI (static binary).
+# Lets the gateway shell out to upstream tool images via tools/run-*-tool.sh
+# wrappers (plaso, vol2, memprocfs, nuclei). Requires /var/run/docker.sock to
+# be bind-mounted from the host - see docker-compose.yml.
 # -----------------------------------------------------------------------------
-RUN printf '%s\n' '#!/bin/sh' 'echo "vol2 unavailable in this image" >&2' 'exit 1' > /usr/local/bin/vol2 \
-    && chmod +x /usr/local/bin/vol2
-
-RUN printf '%s\n' '#!/bin/sh' 'echo "memprocfs unavailable in this image" >&2' 'exit 1' > /usr/local/bin/memprocfs \
-    && chmod +x /usr/local/bin/memprocfs
+RUN curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz" -o /tmp/docker.tgz \
+    && tar -xzf /tmp/docker.tgz -C /tmp \
+    && install -m 0755 /tmp/docker/docker /usr/local/bin/docker \
+    && rm -rf /tmp/docker.tgz /tmp/docker
 
 # -----------------------------------------------------------------------------
 # ProjectDiscovery + OWASP recon binaries
+# (subfinder, httpx-pd, amass stay in-image - small static binaries, fast.
+# nuclei moves to a wrapper that calls projectdiscovery/nuclei:latest so its
+# detection templates stay current without rebuilding the image.)
 # -----------------------------------------------------------------------------
 RUN curl -fsSL "https://github.com/projectdiscovery/subfinder/releases/download/v2.13.0/subfinder_2.13.0_linux_amd64.zip" -o /tmp/subfinder.zip \
     && unzip -q /tmp/subfinder.zip -d /tmp/subfinder \
@@ -128,11 +132,6 @@ RUN curl -fsSL "https://github.com/projectdiscovery/httpx/releases/download/v1.9
     && unzip -q /tmp/httpx.zip -d /tmp/httpx \
     && install -m 0755 /tmp/httpx/httpx /usr/local/bin/httpx-pd \
     && rm -rf /tmp/httpx.zip /tmp/httpx
-
-RUN curl -fsSL "https://github.com/projectdiscovery/nuclei/releases/download/v3.7.1/nuclei_3.7.1_linux_amd64.zip" -o /tmp/nuclei.zip \
-    && unzip -q /tmp/nuclei.zip -d /tmp/nuclei \
-    && install -m 0755 /tmp/nuclei/nuclei /usr/local/bin/nuclei \
-    && rm -rf /tmp/nuclei.zip /tmp/nuclei
 
 RUN curl -fsSL "https://github.com/owasp-amass/amass/releases/download/v5.1.1/amass_linux_amd64.tar.gz" -o /tmp/amass.tar.gz \
     && mkdir -p /tmp/amass \
