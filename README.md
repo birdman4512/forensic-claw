@@ -31,7 +31,8 @@ cd forensic-claw
 ### 2. Run it once — it'll create your `.env` and bail
 
 ```bash
-./start.sh
+./start.sh           # Linux / macOS / Git Bash on Windows
+.\start.ps1          # Windows PowerShell
 ```
 
 First run: there's no `.env` yet, so the script copies `.env.example` to `.env` and exits with instructions. Open `.env` in an editor and fill in **just these four**:
@@ -63,10 +64,13 @@ An interactive wizard. It detects the API key from your `.env`, asks which provi
 ### 4. Start it
 
 ```bash
-./start.sh
+./start.sh           # Linux / macOS / Git Bash on Windows
+.\start.ps1          # Windows PowerShell
 ```
 
 Now that `.env` is filled in, the same script seeds workspace templates, generates a gateway token, wires git hooks, brings everything up, waits for the health check, and prints the dashboard URL. Safe to re-run any time — it's idempotent.
+
+> Windows note: if PowerShell blocks the script with an execution-policy error, either run it once via `powershell -ExecutionPolicy Bypass -File .\start.ps1`, or allow signed-and-local scripts for your user with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
 ### 5. Open the dashboard
 
@@ -126,12 +130,12 @@ You can rename, archive, copy out, or zip up the case folder once you're done. I
 ## Daily use
 
 ```bash
-./start.sh                                          # bring it up
+./start.sh                                          # bring it up (Linux/macOS); use .\start.ps1 on Windows
 docker compose down                                 # take it down
 docker compose logs -f openclaw-gateway             # tail the gateway logs
 docker compose run --rm openclaw-cli dashboard --no-open   # fresh dashboard URL with token
 docker compose run --rm openclaw-cli onboard        # switch model / provider
-./start.sh --build                                  # rebuild image after a Dockerfile change
+./start.sh --build                                  # rebuild image after a Dockerfile change (or .\start.ps1 --build)
 ```
 
 ---
