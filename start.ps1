@@ -19,6 +19,15 @@ if (-not (Test-Path -LiteralPath '.env')) {
 & (Join-Path $PSScriptRoot 'scripts/setup-workspace.ps1')
 if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
 
+$port = '18789'
+$portLine = Get-Content -LiteralPath '.env' |
+    Where-Object { $_ -match '^OPENCLAW_GATEWAY_PORT=' } |
+    Select-Object -First 1
+if ($portLine) {
+    $envPort = $portLine -replace '^OPENCLAW_GATEWAY_PORT=', ''
+    if (-not [string]::IsNullOrWhiteSpace($envPort)) { $port = $envPort }
+}
+
 Write-Output ""
 Write-Output "==> docker compose up -d openclaw-gateway $($args -join ' ')"
 docker compose up -d openclaw-gateway @args
@@ -26,10 +35,14 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Output ""
 Write-Output "==> waiting for gateway healthcheck"
-$port = if ($env:OPENCLAW_GATEWAY_PORT) { $env:OPENCLAW_GATEWAY_PORT } else { '18789' }
 for ($i = 1; $i -le 12; $i++) {
-    $s = docker inspect forensic-claw-openclaw-gateway-1 --format '{{.State.Health.Status}}' 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($s)) { $s = 'missing' }
+    $containerId = docker compose ps -q openclaw-gateway 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($containerId)) {
+        $s = docker inspect $containerId --format '{{.State.Health.Status}}' 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($s)) { $s = 'missing' }
+    } else {
+        $s = 'missing'
+    }
     Write-Output ("    t+{0}s: {1}" -f ($i * 5), $s)
     if ($s -eq 'healthy') {
         Write-Output ""

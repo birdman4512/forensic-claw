@@ -80,10 +80,8 @@ services:
       # Host paths used by the docker-in-docker wrappers (plaso/vol2/memprocfs/
       # nuclei). These MUST be host-side absolute paths because the docker
       # daemon resolves bind-mounts against the host filesystem, not against
-      # the gateway container. Set OPENCLAW_CASES_HOST_PATH and
-      # OPENCLAW_LOGS_HOST_PATH in .env.
+      # the gateway container. Set OPENCLAW_CASES_HOST_PATH in .env.
       FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
-      FORENSIC_CLAW_LOGS_HOST_DIR: ${OPENCLAW_LOGS_HOST_PATH:-}
 
       # Upstream tool images consumed by the wrappers (overridable per-host).
       FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
@@ -184,7 +182,6 @@ services:
       FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
       FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
       FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
-      FORENSIC_CLAW_LOGS_HOST_DIR: ${OPENCLAW_LOGS_HOST_PATH:-}
       FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
       FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-blacktop/volatility:2.6}
       FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-forensic-claw-memprocfs:latest}

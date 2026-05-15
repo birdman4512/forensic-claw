@@ -21,6 +21,9 @@ fi
 
 ./scripts/setup-workspace.sh
 
+gateway_port=$(grep -E '^OPENCLAW_GATEWAY_PORT=' .env | head -n 1 | cut -d= -f2-)
+gateway_port="${gateway_port:-18789}"
+
 echo
 echo "==> docker compose up -d openclaw-gateway $*"
 docker compose up -d openclaw-gateway "$@"
@@ -28,11 +31,16 @@ docker compose up -d openclaw-gateway "$@"
 echo
 echo "==> waiting for gateway healthcheck"
 for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  s=$(docker inspect forensic-claw-openclaw-gateway-1 --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  container_id=$(docker compose ps -q openclaw-gateway 2>/dev/null || true)
+  if [ -n "$container_id" ]; then
+    s=$(docker inspect "$container_id" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  else
+    s="missing"
+  fi
   printf "    t+%ss: %s\n" "$((i*5))" "$s"
   if [ "$s" = "healthy" ]; then
     echo
-    echo "Gateway up at http://localhost:${OPENCLAW_GATEWAY_PORT:-18789}"
+    echo "Gateway up at http://localhost:$gateway_port"
     echo "Need a launch URL with token? run:"
     echo "    docker compose run --rm openclaw-cli dashboard --no-open"
     exit 0

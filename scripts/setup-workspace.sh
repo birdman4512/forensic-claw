@@ -46,8 +46,10 @@ if [ -f .env ]; then
     if [ -n "$new_token" ]; then
       # Portable sed in-place: write to a temp file, replace.
       awk -v tok="$new_token" '
-        /^OPENCLAW_GATEWAY_TOKEN=/ { print "OPENCLAW_GATEWAY_TOKEN=" tok; next }
+        BEGIN { found = 0 }
+        /^OPENCLAW_GATEWAY_TOKEN=/ { print "OPENCLAW_GATEWAY_TOKEN=" tok; found = 1; next }
         { print }
+        END { if (!found) print "OPENCLAW_GATEWAY_TOKEN=" tok }
       ' .env > .env.tmp && mv .env.tmp .env
       echo "    generated a fresh 64-hex-char token and wrote it to .env"
     else

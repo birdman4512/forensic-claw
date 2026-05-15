@@ -74,7 +74,7 @@ Now that `.env` is filled in, the same script seeds workspace templates, generat
 
 ### 5. Open the dashboard
 
-Visit [http://localhost:18789](http://localhost:18789).
+Visit [http://localhost:18789](http://localhost:18789), or the port you set in `OPENCLAW_GATEWAY_PORT`.
 
 If it asks for a token, get the launch URL with the token embedded:
 
