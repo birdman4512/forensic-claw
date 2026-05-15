@@ -102,9 +102,10 @@ services:
     init: true
     restart: unless-stopped
 
+    # Image ENTRYPOINT is already `node /app/dist/index.js`; just pass subcommand args.
     command:
       [
-        "node", "dist/index.js", "gateway",
+        "gateway",
         "--bind", "${OPENCLAW_GATEWAY_BIND:-lan}",
         "--port", "18789",
         "--allow-unconfigured",
@@ -175,6 +176,7 @@ services:
     stdin_open: true
     tty: true
     init: true
-    entrypoint: ["node", "dist/index.js"]
+    # Image ENTRYPOINT is `node /app/dist/index.js`; user passes the subcommand
+    # via `docker compose run --rm openclaw-cli <subcommand>`.
     depends_on:
       - openclaw-gateway
