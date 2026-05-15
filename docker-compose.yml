@@ -11,6 +11,27 @@
 services:
 
   # ---------------------------------------------------------------------------
+  # init-perms – one-shot helper that fixes ownership of the bind-mounted
+  # directories so the `node` user (uid 1000) inside the gateway can chmod
+  # them. Docker Desktop bind-mounts come in as root-owned, which breaks
+  # OpenClaw's exec sandbox (it tries to chmod /home/node/.openclaw on every
+  # exec and fails with EPERM).
+  # ---------------------------------------------------------------------------
+  init-perms:
+    image: alpine:3.20
+    user: root
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./config}:/mnt/config
+      - ${OPENCLAW_WORKSPACE_DIR:-./workspace}:/mnt/workspace
+      - ${OPENCLAW_SKILLS_DIR:-./skills}:/mnt/skills
+      - ${OPENCLAW_CASES_DIR:-./cases}:/mnt/cases
+      - ${OPENCLAW_LOGS_DIR:-./logs}:/mnt/logs
+    entrypoint: ["sh", "-c"]
+    command:
+      - 'chown 1000:1000 /mnt/config /mnt/workspace /mnt/skills /mnt/cases /mnt/logs'
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
   # Gateway – the main OpenClaw process
   # ---------------------------------------------------------------------------
   openclaw-gateway:
@@ -101,6 +122,10 @@ services:
 
     init: true
     restart: unless-stopped
+
+    depends_on:
+      init-perms:
+        condition: service_completed_successfully
 
     # Image ENTRYPOINT is already `node /app/dist/index.js`; just pass subcommand args.
     command:

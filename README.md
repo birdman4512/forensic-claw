@@ -84,8 +84,12 @@ You can re-run `onboard` any time to switch providers or models.
 ### 6. Start the gateway
 
 ```bash
-docker compose up -d openclaw-gateway
+./start.sh
 ```
+
+This wrapper runs `setup-workspace.sh` (templates / token / hooks — idempotent) then `docker compose up -d openclaw-gateway`, waits for the healthcheck, and prints the dashboard URL. Pass-through args go to `docker compose up`, e.g. `./start.sh --build` rebuilds the image first.
+
+> If you'd rather run docker compose directly, that works too — you'll just need to remember to run `./scripts/setup-workspace.sh` yourself first.
 
 ### 7. Open the dashboard
 
@@ -104,8 +108,8 @@ That's it. You can now hand the agent a case (drop evidence into `./cases/<case-
 ## Daily usage
 
 ```bash
-# Start
-docker compose up -d openclaw-gateway
+# Start (preferred — runs setup-workspace.sh, brings up the stack, waits for healthcheck)
+./start.sh
 
 # Stop
 docker compose down
