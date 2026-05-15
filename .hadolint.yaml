@@ -1,0 +1,15 @@
+ignored:
+  # DL3006: Always tag the version of an image explicitly.
+  # Our FROM uses an ARG whose default already includes a tag
+  # (`ghcr.io/phioranex/openclaw-docker:latest`); hadolint can't see through ARG.
+  - DL3006
+
+  # DL3008: Pin apt-get package versions.
+  # Impractical for a forensic toolchain with ~50 packages whose versions vary
+  # by Debian release; the upstream OpenClaw base image dictates the release.
+  - DL3008
+
+  # DL3013: Pin pip package versions.
+  # Same rationale - we install a broad set of forensic Python packages
+  # (plaso, volatility3, ...) and want to track upstream rather than pin.
+  - DL3013

@@ -1,0 +1,160 @@
+# =============================================================================
+# OpenClaw – Docker Compose
+# =============================================================================
+# Quick start:
+#   cp .env.example .env        # fill in your secrets
+#   docker compose build        # build the custom image (installs extra tools)
+#   docker compose run --rm openclaw-cli onboard
+#   docker compose up -d openclaw-gateway
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Gateway – the main OpenClaw process
+  # ---------------------------------------------------------------------------
+  openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-ghcr.io/phioranex/openclaw-docker:latest}
+    image: openclaw-custom:latest          # tag the built image locally
+    env_file: .env
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      TZ: ${OPENCLAW_TZ:-Australia/Brisbane}
+
+      # Gateway auth
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
+      OPENCLAW_DISABLE_BONJOUR: ${OPENCLAW_DISABLE_BONJOUR:-}
+
+      # AI provider secrets (passed from .env)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_ORG_ID: ${OPENAI_ORG_ID:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # Claude web session (optional)
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+
+      # Observability
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-openclaw}
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      OPENCLAW_OTEL_PRELOADED: ${OPENCLAW_OTEL_PRELOADED:-}
+
+      # Forensic Claw tool wrappers (run-forensic-tool.sh and friends) write
+      # an auto-log line per invocation into FORENSIC_CLAW_LOG_DIR.
+      FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
+      FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
+
+    volumes:
+      # Core OpenClaw config & session data
+      - ${OPENCLAW_CONFIG_DIR:-./config}:/home/node/.openclaw
+
+      # Workspace – files the agent reads/writes; supports sub-agents sharing state
+      - ${OPENCLAW_WORKSPACE_DIR:-./workspace}:/home/node/.openclaw/workspace
+
+      # Skills – custom skills loaded by the agent
+      - ${OPENCLAW_SKILLS_DIR:-./skills}:/home/node/.openclaw/skills
+
+      # Cases – task/case files handed to the agent
+      - ${OPENCLAW_CASES_DIR:-./cases}:/home/node/.openclaw/cases
+
+      # Forensic Claw tool-command history log (auto-written by run-forensic-tool.sh)
+      - ${OPENCLAW_LOGS_DIR:-./logs}:/home/node/.openclaw/logs
+
+      # ------------------------------------------------------------------
+      # Sub-agent sandbox (Docker-in-Docker)
+      # Uncomment these three lines and set OPENCLAW_SANDBOX=1 in .env
+      # to allow the gateway to spawn isolated sub-agent containers.
+      # Run: stat -c '%g' /var/run/docker.sock  to get DOCKER_GID (Linux).
+      # ------------------------------------------------------------------
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+    # Uncomment when sandbox is enabled (adds node user to the docker group)
+    # group_add:
+    #   - "${DOCKER_GID:-999}"
+
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"   # Web UI / API
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"    # Internal bridge
+
+    init: true
+    restart: unless-stopped
+
+    command:
+      [
+        "node", "dist/index.js", "gateway",
+        "--bind", "${OPENCLAW_GATEWAY_BIND:-lan}",
+        "--port", "18789",
+        "--allow-unconfigured",
+      ]
+
+    healthcheck:
+      test:
+        [
+          "CMD", "node", "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # CLI – one-shot helper for onboarding, dashboard tokens, device approval, etc.
+  # Usage: docker compose run --rm openclaw-cli <command>
+  #   e.g. docker compose run --rm openclaw-cli onboard
+  #        docker compose run --rm openclaw-cli dashboard --no-open
+  #        docker compose run --rm openclaw-cli devices list
+  # ---------------------------------------------------------------------------
+  openclaw-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-ghcr.io/phioranex/openclaw-docker:latest}
+    image: openclaw-custom:latest          # reuses the same built image
+    network_mode: "service:openclaw-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    env_file: .env
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      BROWSER: echo                        # prevents headless browser pop-ups
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+      TZ: ${OPENCLAW_TZ:-Australia/Brisbane}
+
+      FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
+      FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-./workspace}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_SKILLS_DIR:-./skills}:/home/node/.openclaw/skills
+      - ${OPENCLAW_CASES_DIR:-./cases}:/home/node/.openclaw/cases
+      - ${OPENCLAW_LOGS_DIR:-./logs}:/home/node/.openclaw/logs
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint: ["node", "dist/index.js"]
+    depends_on:
+      - openclaw-gateway

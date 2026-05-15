@@ -1,0 +1,32 @@
+{
+  "caseId": "CASE-YYYYMMDD-01",
+  "caseName": "",
+  "createdAt": "",
+  "updatedAt": "",
+  "requestedBy": "business-claw",
+  "assignedTo": "forensic-claw",
+  "status": "draft",
+  "phase": "intake",
+  "priority": "normal",
+  "authorizationConfirmed": false,
+  "readOnlyRequired": true,
+  "evidenceReady": false,
+  "progressNote": "Awaiting scoping details and evidence paths.",
+  "currentTask": "Pending intake",
+  "nextStep": "Confirm scope, evidence location, and handling requirements.",
+  "resumeFrom": "Resume from intake once the user provides evidence or a clear question.",
+  "lastUpdatedBy": "forensic-claw",
+  "outputs": {
+    "brief": "brief.md",
+    "findings": "findings.md",
+    "notesDir": "notes/",
+    "outputsDir": "outputs/"
+  },
+  "timestamps": {
+    "queuedAt": "",
+    "createdAt": "",
+    "startedAt": "",
+    "lastUpdatedAt": "",
+    "completedAt": ""
+  }
+}

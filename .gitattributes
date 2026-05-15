@@ -1,0 +1,6 @@
+# Force LF for files that run inside the Linux container.
+# Without this, a Windows clone could commit CRLF and break bash/Docker.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf

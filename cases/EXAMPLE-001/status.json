@@ -1,0 +1,32 @@
+{
+  "caseId": "EXAMPLE-001",
+  "caseName": "Example case",
+  "createdAt": "2026-05-15",
+  "updatedAt": "2026-05-15",
+  "requestedBy": "operator",
+  "assignedTo": "forensic-claw",
+  "status": "draft",
+  "phase": "intake",
+  "priority": "normal",
+  "authorizationConfirmed": false,
+  "readOnlyRequired": true,
+  "evidenceReady": false,
+  "progressNote": "Skeleton case. Replace with a real intake when starting work.",
+  "currentTask": "Pending intake",
+  "nextStep": "Run tools/new-case.sh <new-case-id> to create a real case from templates",
+  "resumeFrom": "",
+  "lastUpdatedBy": "forensic-claw",
+  "outputs": {
+    "brief": "brief.md",
+    "findings": "findings.md",
+    "notesDir": "notes/",
+    "outputsDir": "outputs/"
+  },
+  "timestamps": {
+    "queuedAt": "",
+    "createdAt": "2026-05-15",
+    "startedAt": "",
+    "lastUpdatedAt": "2026-05-15",
+    "completedAt": ""
+  }
+}
