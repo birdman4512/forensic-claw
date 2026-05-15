@@ -28,13 +28,13 @@ git clone https://github.com/birdman4512/forensic-claw.git
 cd forensic-claw
 ```
 
-### 2. Create your `.env`
+### 2. Run it once — it'll create your `.env` and bail
 
 ```bash
-cp .env.example .env
+./start.sh
 ```
 
-Open `.env` in an editor and fill in **just these four**:
+First run: there's no `.env` yet, so the script copies `.env.example` to `.env` and exits with instructions. Open `.env` in an editor and fill in **just these four**:
 
 ```dotenv
 ANTHROPIC_API_KEY=sk-ant-...
@@ -52,29 +52,23 @@ OPENCLAW_TZ=Australia/Brisbane
 
 > ⚠ Don't put a `# comment` after a value on the same line — `.env` keeps the whole rest of the line as part of the value, which silently breaks things. Comments belong on their own lines.
 
-### 3. Build the Docker image (one-off, ~3-8 min)
-
-```bash
-docker compose build
-```
-
-### 4. Pick your model
+### 3. Pick your model
 
 ```bash
 docker compose run --rm openclaw-cli onboard
 ```
 
-An interactive wizard. It detects the API key from your `.env`, asks which provider to use, and asks which model. For Claude, pick the latest Sonnet or Opus. For OpenAI, pick GPT-4o or newer. Your choice is saved to `./config/`.
+An interactive wizard. It detects the API key from your `.env`, asks which provider to use, and asks which model. For Claude, pick the latest Sonnet or Opus. For OpenAI, pick GPT-4o or newer. Your choice is saved to `./config/`. Compose will build the image on demand the first time this runs (~3–8 min).
 
-### 5. Start it
+### 4. Start it
 
 ```bash
 ./start.sh
 ```
 
-The script does any first-run housekeeping, brings everything up, waits for the health check, and prints the dashboard URL.
+Now that `.env` is filled in, the same script seeds workspace templates, generates a gateway token, wires git hooks, brings everything up, waits for the health check, and prints the dashboard URL. Safe to re-run any time — it's idempotent.
 
-### 6. Open the dashboard
+### 5. Open the dashboard
 
 Visit [http://localhost:18789](http://localhost:18789).
 
@@ -92,25 +86,17 @@ Open the printed URL — you're in.
 
 The agent works in **cases**. A case is a folder under `./cases/<case-id>/` with a fixed structure: a brief, status, findings, a worklog, an evidence dir, and an outputs dir. Everything you and the agent do is captured there, so you can read it later or hand it to someone else.
 
-### Start a new case
-
-In your terminal:
-
-```bash
-docker compose exec openclaw-gateway /home/node/.openclaw/workspace/tools/new-case.sh CASE-2026-001
-```
-
-This creates `./cases/CASE-2026-001/` from the templates in `cases/templates/`, with empty `brief.md`, `findings.md`, `status.json`, `notes/worklog.md`, and `evidence/` and `outputs/` folders ready to use. Use any case id you like (`CASE-001`, `incident-2026-05-15`, `client-acme-q2`, …).
-
 ### Drop in your evidence
 
-Copy the artefacts you want analyzed into `./cases/CASE-2026-001/evidence/`. The agent works on this directory directly — it can be a packet capture, a memory dump, a disk image, suspect binaries, log archives, anything.
+Make a folder under `./cases/` named however you like (`CASE-001`, `incident-2026-05-15`, `client-acme-q2`, …) and copy your artefacts into it — packet captures, memory dumps, disk images, suspect binaries, log archives, anything. The folder structure is flat: one subfolder per case directly under `./cases/`.
 
 ### Hand the case to the agent
 
-Open the dashboard, start a new conversation, and tell the agent something like:
+Open the dashboard, start a new conversation, point the agent at `cases/`, and tell it what you want answered. For example:
 
-> "Take a look at the OT-PCAP case under cases/. The evidence is in evidence/capture.pcap. Identify any unusual traffic, build a timeline of attacker activity, and put your findings in findings.md."
+> "Look at what's under `cases/`. There's an OT-PCAP folder with three packet captures. Identify any unusual traffic, build a timeline of attacker activity, and answer: (1) what was the initial entry vector, (2) which hosts were involved, (3) was any data exfiltrated. Put findings in `findings.md`."
+
+The agent will set up the standard case scaffolding (`brief.md`, `status.json`, `findings.md`, `notes/worklog.md`, `evidence/`, `outputs/`) the first time it touches a case folder — you don't need to pre-create those files.
 
 The agent will:
 
