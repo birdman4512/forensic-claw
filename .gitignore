@@ -14,15 +14,10 @@ workspace/MEMORY.md
 workspace/USER.md
 
 # Case data (often sensitive: evidence, findings, credentials in worklogs).
-# Templates and the EXAMPLE-001 skeleton are tracked; real cases are not.
+# Only the templates folder is tracked. Real case folders, including the
+# EXAMPLE-001 skeleton seeded by scripts/setup-workspace.sh, stay local.
 cases/*
 !cases/templates/
-!cases/EXAMPLE-001/
-# Within EXAMPLE-001, never track actual evidence or generated outputs.
-cases/EXAMPLE-001/evidence/*
-!cases/EXAMPLE-001/evidence/.gitkeep
-cases/EXAMPLE-001/outputs/*
-!cases/EXAMPLE-001/outputs/.gitkeep
 
 # OS / editor cruft
 .DS_Store
