@@ -8,6 +8,11 @@ config/
 logs/
 workspace/.openclaw/
 
+# Live agent-mutable files (seeded from workspace/*.template.md by
+# scripts/setup-workspace.sh). Templates ship in git, live copies don't.
+workspace/MEMORY.md
+workspace/USER.md
+
 # Case data (often sensitive: evidence, findings, credentials in worklogs).
 # Templates and the EXAMPLE-001 skeleton are tracked; real cases are not.
 cases/*

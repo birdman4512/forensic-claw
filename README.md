@@ -17,6 +17,12 @@ A Docker setup for running [OpenClaw](https://github.com/phioranex/openclaw-dock
 
 Clone or download this repo, then open a terminal in the project folder.
 
+```bash
+./scripts/setup-workspace.sh
+```
+
+This seeds `workspace/MEMORY.md` and `workspace/USER.md` from the tracked `*.template.md` files (those live copies are gitignored — they collect per-machine agent state) and wires up `.githooks/` so the reference-guard runs on every commit. Re-runnable any time; existing live files aren't overwritten.
+
 ### 2. Configure your environment
 
 Copy the env template and open it in your editor:

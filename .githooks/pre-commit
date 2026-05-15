@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Pre-commit hook: refuses commits that contain forbidden references
+# (personal info, old host paths, known-leaked credentials).
+# Bypass with `git commit --no-verify` if you really need to.
+exec ./scripts/check-references.sh
