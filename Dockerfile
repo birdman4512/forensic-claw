@@ -11,16 +11,24 @@ USER root
 
 # -----------------------------------------------------------------------------
 # Patch pi-ai's OpenAI Codex provider to present as chatgpt-web rather than pi.
+# Best-effort: if the upstream pi-ai layout changes (file moves, header block
+# refactored), warn and continue rather than failing the whole build. Re-check
+# the warning on each base-image bump and update the path/old-block as needed.
 # -----------------------------------------------------------------------------
 RUN python3 - <<'PY'
 from pathlib import Path
 p = Path('/app/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js')
-text = p.read_text()
 old = '    headers.set("originator", "pi");\n    const userAgent = _os ? `pi (${_os.platform()} ${_os.release()}; ${_os.arch()})` : "pi (browser)";\n    headers.set("User-Agent", userAgent);\n'
 new = '    headers.set("originator", "chatgpt-web");\n    const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";\n    headers.set("User-Agent", userAgent);\n'
-if old not in text:
-    raise SystemExit('expected codex header block not found')
-p.write_text(text.replace(old, new, 1))
+if not p.exists():
+    print(f"WARN: {p} not present in base image - skipping pi-ai originator/UA patch")
+else:
+    text = p.read_text()
+    if old not in text:
+        print(f"WARN: expected header block not found in {p} - upstream pi-ai layout changed; skipping patch")
+    else:
+        p.write_text(text.replace(old, new, 1))
+        print(f"patched {p}")
 PY
 
 # -----------------------------------------------------------------------------
