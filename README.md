@@ -1,5 +1,9 @@
 # Forensic Claw
 
+<p align="center">
+  <img src="assets/forensic-claw.png" alt="Forensic Claw" width="320">
+</p>
+
 A self-contained DFIR (digital forensics & incident response) workstation, packaged as a Docker setup. You bring evidence — disk images, memory dumps, packet captures, log archives, suspect binaries. The agent picks the right forensic tool for the job, runs it under your supervision, and writes findings into a per-case folder you can review and share.
 
 Built on top of [OpenClaw](https://github.com/phioranex/openclaw-docker), pre-loaded with the forensic toolchain (Sleuth Kit, Volatility, Plaso, Wireshark/tshark, exiftool, YARA, foremost, …) and a curated set of agent skills that know how to use them safely.
