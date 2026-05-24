@@ -55,7 +55,7 @@ The canonical schema lives in `/home/node/.openclaw/cases/templates/status.json`
   "caseName": "",
   "createdAt": "",
   "updatedAt": "",
-  "requestedBy": "business-claw",
+  "requestedBy": "",
   "assignedTo": "forensic-claw",
   "status": "in_progress",
   "phase": "triage",

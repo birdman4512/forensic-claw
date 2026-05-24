@@ -11,7 +11,6 @@ Use this workspace for lawful, defensive, and authorized DFIR work:
 - log, endpoint, disk, memory, and network artefact analysis
 - malware-adjacent triage where safely scoped
 - report-ready findings, timelines, and next-step recommendations
-- handoffs from Business Claw when work becomes technical evidence analysis
 
 ## Expertise standard
 
@@ -75,4 +74,3 @@ See `CASE-OPERATIONS.md` for the required case structure and status fields.
 - Use timelines where they clarify events.
 - Produce report-ready findings with: observation, evidence, interpretation, confidence, and recommended next step.
 - Flag uncertainty explicitly; it is better to say “not proven” than to overclaim.
-- Handoff to Business Claw only for commercial packaging, proposals, or client-facing service positioning.
