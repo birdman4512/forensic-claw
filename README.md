@@ -142,6 +142,17 @@ docker compose run --rm openclaw-cli onboard        # switch model / provider
 ./start.sh --build                                  # rebuild image after a Dockerfile change (or .\start.ps1 --build)
 ```
 
+### Upgrading to the latest OpenClaw
+
+The base image (`OPENCLAW_IMAGE` in `.env`) tracks `ghcr.io/phioranex/openclaw-docker:latest`, which upstream rebuilds daily. The build is configured with `pull: true`, so a rebuild always re-fetches the newest base:
+
+```bash
+docker compose build --pull        # pull newest OpenClaw base + rebuild the custom image
+./start.sh --force-recreate        # restart the gateway on the new image (or .\start.ps1 --force-recreate)
+```
+
+To pin a specific version instead of tracking `latest`, set `OPENCLAW_IMAGE` in `.env` to a dated tag, e.g. `ghcr.io/phioranex/openclaw-docker:20260602`.
+
 ---
 
 ## Where your work lives

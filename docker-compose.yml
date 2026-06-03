@@ -38,6 +38,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Always re-fetch the OPENCLAW_IMAGE base on build so `:latest` actually
+      # tracks upstream instead of reusing a stale cached FROM layer.
+      pull: true
       args:
         OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-ghcr.io/phioranex/openclaw-docker:latest}
     image: openclaw-custom:latest          # tag the built image locally
@@ -156,6 +159,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      pull: true
       args:
         OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-ghcr.io/phioranex/openclaw-docker:latest}
     image: openclaw-custom:latest          # reuses the same built image

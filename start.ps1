@@ -1,13 +1,28 @@
 # Forensic Claw - one-shot start (PowerShell port of start.sh).
 # Runs on Windows PowerShell 5.1+, Windows PS Core (pwsh), and Linux/macOS pwsh.
 # Pass-through args go to `docker compose up`. Common ones:
-#   .\start.ps1                  # plain start
+#   .\start.ps1                  # plain start (prompts for a model on first run)
+#   .\start.ps1 -SelectModel     # (re)choose the model: cloud or local Gemma
+#   .\start.ps1 -Model gemma     # switch to local Gemma 4 12B, non-interactive
+#   .\start.ps1 -Model cloud     # run the cloud onboard wizard
 #   .\start.ps1 --build          # rebuild image first (after Dockerfile change)
 #   .\start.ps1 --force-recreate # recreate containers (after .env change)
+
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    # Force the model picker even if one is already configured.
+    [switch]$SelectModel,
+    # Pick a model non-interactively: 'cloud' (onboard wizard) or 'gemma'.
+    [ValidateSet('cloud', 'gemma')] [string]$Model,
+    # Everything else is passed straight through to `docker compose up`.
+    [Parameter(ValueFromRemainingArguments = $true)] $ComposeArgs
+)
 
 $ErrorActionPreference = 'Stop'
 
 Set-Location $PSScriptRoot
+
+if ($null -eq $ComposeArgs) { $ComposeArgs = @() }
 
 if (-not (Test-Path -LiteralPath '.env')) {
     Write-Output "==> .env missing - copying from .env.example"
@@ -19,6 +34,51 @@ if (-not (Test-Path -LiteralPath '.env')) {
 & (Join-Path $PSScriptRoot 'scripts/setup-workspace.ps1')
 if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
 
+# ---------------------------------------------------------------------------
+# Model selection. Auto-prompts on first run (no model configured yet); stays
+# silent once a model is set. Force it anytime with -SelectModel / -Model.
+# ---------------------------------------------------------------------------
+$configDir = './config'
+$cfgLine = Get-Content -LiteralPath '.env' |
+    Where-Object { $_ -match '^OPENCLAW_CONFIG_DIR=' } | Select-Object -First 1
+if ($cfgLine) {
+    $v = ($cfgLine -replace '^OPENCLAW_CONFIG_DIR=', '').Trim()
+    if (-not [string]::IsNullOrWhiteSpace($v)) { $configDir = $v }
+}
+$openclawPath = Join-Path $configDir 'openclaw.json'
+
+$primary = $null
+if (Test-Path -LiteralPath $openclawPath) {
+    try { $primary = (Get-Content -Raw -LiteralPath $openclawPath | ConvertFrom-Json).agents.defaults.model.primary }
+    catch { $primary = $null }
+}
+
+$selector = Join-Path $PSScriptRoot 'scripts/select-model.ps1'
+$modelChanged = $false
+if ($SelectModel -or $Model) {
+    if ($Model) { & $selector -Choice $Model } else { & $selector }
+    if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
+    $modelChanged = $true
+} elseif (-not $primary) {
+    if (-not [Environment]::UserInteractive) {
+        Write-Output "==> no model configured and this isn't an interactive session."
+        Write-Output "    run:  .\start.ps1 -Model gemma   (or -Model cloud)"
+        exit 1
+    }
+    Write-Output ""
+    Write-Output "==> no model configured yet"
+    & $selector
+    if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
+    $modelChanged = $true
+} else {
+    Write-Output "==> model: $primary  (use .\start.ps1 -SelectModel to change)"
+}
+
+# A config change only takes effect on a fresh container, so recreate.
+if ($modelChanged -and ($ComposeArgs -notcontains '--force-recreate')) {
+    $ComposeArgs += '--force-recreate'
+}
+
 $port = '18789'
 $portLine = Get-Content -LiteralPath '.env' |
     Where-Object { $_ -match '^OPENCLAW_GATEWAY_PORT=' } |
@@ -29,8 +89,8 @@ if ($portLine) {
 }
 
 Write-Output ""
-Write-Output "==> docker compose up -d openclaw-gateway $($args -join ' ')"
-docker compose up -d openclaw-gateway @args
+Write-Output "==> docker compose up -d openclaw-gateway $($ComposeArgs -join ' ')"
+docker compose up -d openclaw-gateway @ComposeArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Output ""
