@@ -28,7 +28,62 @@ services:
       - ${OPENCLAW_LOGS_DIR:-./logs}:/mnt/logs
     entrypoint: ["sh", "-c"]
     command:
-      - 'chown 1000:1000 /mnt/config /mnt/workspace /mnt/skills /mnt/cases /mnt/logs'
+      - 'chown -R 1000:1000 /mnt/config /mnt/workspace /mnt/skills /mnt/cases /mnt/logs'
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # init-config – one-shot helper that ensures the ollama provider is present
+  # in models.json before the gateway starts. The gateway rewrites this file
+  # with cloud-only defaults on first clean init, so we merge the ollama block
+  # in every time via jq, preserving any other providers already there.
+  # ---------------------------------------------------------------------------
+  init-config:
+    image: alpine:3.20
+    user: root
+    depends_on:
+      init-perms:
+        condition: service_completed_successfully
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./config}:/mnt/config
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        apk add --quiet --no-cache jq
+        CFG=/mnt/config/openclaw.json
+        AUTH=/mnt/config/agents/main/agent/auth-profiles.json
+        MODEL="${OPENCLAW_LOCAL_MODEL:-qwen3:14b}"
+        MODEL_NAME="${OPENCLAW_LOCAL_MODEL_NAME:-Qwen3 14B (local)}"
+        REF="ollama/$$MODEL"
+        mkdir -p "$$(dirname "$$CFG")" "$$(dirname "$$AUTH")"
+        [ -f "$$CFG" ]  || echo '{}' > "$$CFG"
+        [ -f "$$AUTH" ] || echo '{"version":1,"profiles":{}}' > "$$AUTH"
+        # Register the local Ollama provider under models.providers (where the
+        # gateway's model resolver reads it) using the NATIVE "ollama" api, which
+        # grants the host-network SSRF exemption needed to reach the host from the
+        # container. Idempotent; does NOT change the active model - that is the
+        # user's choice (local vs cloud) made by select-model / onboard.
+        PROVIDER=$$(jq -n --arg model "$$MODEL" --arg name "$$MODEL_NAME" '{
+          baseUrl: "http://host.docker.internal:11434", api: "ollama", apiKey: "ollama",
+          timeoutSeconds: 600,
+          models: [ { id: $$model, name: $$name, input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 40960, maxTokens: 8192 } ]
+        }')
+        jq --argjson p "$$PROVIDER" --arg ref "$$REF" '
+          .models = (.models // {}) | .models.providers = (.models.providers // {}) |
+          .models.providers.ollama = $$p |
+          .agents = (.agents // {}) | .agents.defaults = (.agents.defaults // {}) |
+          .agents.defaults.models = (.agents.defaults.models // {}) |
+          .agents.defaults.models[$$ref] = (.agents.defaults.models[$$ref] // {}) |
+          .auth = (.auth // {}) | .auth.profiles = (.auth.profiles // {}) |
+          .auth.profiles["ollama:default"] = { provider: "ollama", mode: "api_key" }
+        ' "$$CFG" > "$$CFG.tmp" && mv "$$CFG.tmp" "$$CFG"
+        # Ollama ignores the key, but the gateway requires an auth profile for a
+        # non-loopback host (host.docker.internal), so seed a placeholder.
+        jq '.version = (.version // 1) | .profiles = (.profiles // {}) |
+          .profiles["ollama:default"] = { type: "api_key", provider: "ollama", key: "ollama" }
+        ' "$$AUTH" > "$$AUTH.tmp" && mv "$$AUTH.tmp" "$$AUTH"
+        echo "local Ollama provider ($$MODEL) ensured in $$CFG"
     restart: "no"
 
   # ---------------------------------------------------------------------------
@@ -59,6 +114,11 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_ORG_ID: ${OPENAI_ORG_ID:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # Local Ollama (runs on the host). The gateway's native ollama provider
+      # probes this URL to discover models; host.docker.internal reaches the
+      # host from inside the container. Ollama itself must bind 0.0.0.0:11434.
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
 
       # Claude web session (optional)
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
@@ -125,7 +185,7 @@ services:
     restart: unless-stopped
 
     depends_on:
-      init-perms:
+      init-config:
         condition: service_completed_successfully
 
     # Image ENTRYPOINT is already `node /app/dist/index.js`; just pass subcommand args.

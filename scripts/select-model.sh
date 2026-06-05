@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 # Forensic Claw - unified model selector (bash twin of select-model.ps1).
 #
-# OpenClaw's built-in `onboard` wizard only knows the two CLOUD providers
-# (Anthropic / OpenAI) and has no option for a local model. This wrapper adds
-# that choice: pick a cloud provider (it just delegates to `onboard`) or the
-# LOCAL Gemma 4 12B provider served by Ollama (it writes ./config/ directly,
-# installs Ollama, and pulls the model).
+# Forensic Claw can run on a CLOUD model (Anthropic / OpenAI via OpenClaw's
+# `onboard` wizard) or a LOCAL model served by Ollama on the host. This wrapper
+# offers both:
+#   - cloud: delegates to `onboard`.
+#   - local: records the model in .env (docker-compose's init-config step
+#            registers the Ollama provider on every start), sets it as the
+#            active model, then installs Ollama + pulls the model on the host.
 #
 # Usage:
 #   ./scripts/select-model.sh                  # interactive menu
 #   ./scripts/select-model.sh --choice cloud   # run the onboard wizard
-#   ./scripts/select-model.sh --choice gemma   # configure local Gemma 4 12B
-#   ./scripts/select-model.sh --choice gemma --model gemma4:27b --model-name 'Gemma 4 27B'
-#   ./scripts/select-model.sh --choice gemma --skip-ollama-setup   # config only
+#   ./scripts/select-model.sh --choice local   # configure the local model (Ollama)
+#   ./scripts/select-model.sh --choice local --model qwen2.5-coder:14b --model-name 'Qwen2.5 Coder 14B'
+#   ./scripts/select-model.sh --choice local --skip-ollama-setup   # config only
+#
+# The local model MUST support tool-calling (Gemma 2/3/4 do NOT). Good choices:
+# qwen3:14b (default), qwen2.5-coder:14b, llama3.1:8b. A discrete GPU is strongly
+# recommended - see docs/run-with-local-model.md.
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 
 choice=""
-model="gemma4:12b"
-model_name="Gemma 4 12B (local)"
-ollama_url="http://host.docker.internal:11434/v1"
-context_window="128000"
-max_tokens="8192"
+model="qwen3:14b"
+model_name="Qwen3 14B (local)"
 config_dir=""
 skip_ollama=0
 
@@ -34,8 +37,6 @@ while [ $# -gt 0 ]; do
     --model=*) model="${1#*=}"; shift;;
     --model-name) model_name="$2"; shift 2;;
     --model-name=*) model_name="${1#*=}"; shift;;
-    --ollama-url) ollama_url="$2"; shift 2;;
-    --ollama-url=*) ollama_url="${1#*=}"; shift;;
     --config-dir) config_dir="$2"; shift 2;;
     --config-dir=*) config_dir="${1#*=}"; shift;;
     --skip-ollama-setup) skip_ollama=1; shift;;
@@ -43,11 +44,25 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Replace or append KEY=value in .env.
+set_env() {
+  key="$1"; val="$2"
+  [ -f .env ] || : > .env
+  if grep -qE "^${key}=" .env; then
+    tmp=$(mktemp)
+    # Use a sed delimiter unlikely to appear in a model id/name.
+    sed -E "s#^${key}=.*#${key}=${val}#" .env > "$tmp" && mv "$tmp" .env
+  else
+    printf '%s=%s\n' "$key" "$val" >> .env
+  fi
+}
+
 # Resolve config dir (mirrors docker-compose's OPENCLAW_CONFIG_DIR).
 if [ -z "$config_dir" ]; then
   config_dir="./config"
   if [ -f .env ]; then
-    v=$(grep -E '^OPENCLAW_CONFIG_DIR=' .env | head -n 1 | cut -d= -f2- || true)
+    v=$(grep -E '^OPENCLAW_CONFIG_DIR=' .env | head -n 1 | cut -d= -f2- \
+      | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' || true)
     [ -n "${v:-}" ] && config_dir="$v"
   fi
 fi
@@ -56,15 +71,16 @@ fi
 if [ -z "$choice" ]; then
   echo "Select the model Forensic Claw should use:"
   echo "  [1] Cloud provider (Anthropic / OpenAI)  - runs the onboard wizard"
-  echo "  [2] Local Gemma 4 12B via Ollama         - offline, no API key"
+  echo "  [2] Local model via Ollama ($model)      - offline, no API key, needs a good GPU"
   printf "Enter 1 or 2: "
   read -r sel
   case "$sel" in
     1) choice="cloud";;
-    2) choice="gemma";;
+    2) choice="local";;
     *) echo "Invalid choice '$sel' - aborting." >&2; exit 1;;
   esac
 fi
+[ "$choice" = "gemma" ] && choice="local"   # deprecated alias
 
 # Cloud path: hand off to the upstream wizard unchanged.
 if [ "$choice" = "cloud" ]; then
@@ -72,48 +88,29 @@ if [ "$choice" = "cloud" ]; then
   exec docker compose run --rm openclaw-cli onboard
 fi
 
-if [ "$choice" != "gemma" ]; then
-  echo "Unknown choice: $choice (expected 'cloud' or 'gemma')" >&2
+if [ "$choice" != "local" ]; then
+  echo "Unknown choice: $choice (expected 'cloud' or 'local')" >&2
   exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Gemma path: write provider + active model into ./config/ via python3
-# (loads existing config or scaffolds a minimal baseline if this is a fresh
-# clone - config/ is gitignored so it may not exist yet).
+# Local path. The Ollama provider is registered by docker-compose's init-config
+# step (reading OPENCLAW_LOCAL_MODEL); here we record the choice in .env and set
+# it as the active model in openclaw.json.
 # ---------------------------------------------------------------------------
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "ERROR: python3 is required to edit the JSON config but wasn't found." >&2
-  echo "       Install python3, or edit config by hand (see docs/run-with-gemma-4-12b.md)." >&2
-  exit 1
-fi
-
 ref="ollama/$model"
-FC_CONFIG_DIR="$config_dir" FC_MODEL="$model" FC_MODEL_NAME="$model_name" \
-FC_OLLAMA_URL="$ollama_url" FC_CTX="$context_window" FC_MAXT="$max_tokens" \
-python3 - <<'PY'
+
+echo "==> recording local model in .env (OPENCLAW_LOCAL_MODEL=$model)"
+set_env OPENCLAW_LOCAL_MODEL "$model"
+set_env OPENCLAW_LOCAL_MODEL_NAME "$model_name"
+
+echo "==> setting active model to '$ref' in $config_dir/openclaw.json"
+if command -v python3 >/dev/null 2>&1; then
+  FC_CONFIG_DIR="$config_dir" FC_REF="$ref" python3 - <<'PY'
 import json, os, secrets, pathlib
-
 config_dir = pathlib.Path(os.environ['FC_CONFIG_DIR'])
-model      = os.environ['FC_MODEL']
-name       = os.environ['FC_MODEL_NAME']
-url        = os.environ['FC_OLLAMA_URL']
-ctx        = int(os.environ['FC_CTX'])
-maxt       = int(os.environ['FC_MAXT'])
-provider   = 'ollama'
-ref        = f"{provider}/{model}"
-
-models_path   = config_dir / 'agents' / 'main' / 'agent' / 'models.json'
+ref = os.environ['FC_REF']
 openclaw_path = config_dir / 'openclaw.json'
-
-def load(p, default):
-    return json.loads(p.read_text()) if p.exists() else default
-
-def backup_write(p, obj):
-    p.parent.mkdir(parents=True, exist_ok=True)
-    if p.exists():
-        (p.parent / (p.name + '.bak')).write_text(p.read_text())
-    p.write_text(json.dumps(obj, indent=2) + "\n")
 
 def gateway_token():
     envp = pathlib.Path('.env')
@@ -125,41 +122,31 @@ def gateway_token():
                     return t
     return secrets.token_hex(32)
 
-# models.json - add the ollama provider.
-m = load(models_path, {"providers": {}})
-m.setdefault("providers", {})
-m["providers"][provider] = {
-    "baseUrl": url, "apiKey": "ollama", "auth": "api_key", "api": "openai-completions",
-    "models": [{
-        "id": model, "name": name, "api": "openai-completions",
-        "input": ["text", "image"],
-        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-        "contextWindow": ctx, "maxTokens": maxt,
-    }],
-}
-backup_write(models_path, m)
-print(f"    provider '{provider}' ({model}) written to {models_path}")
-
-# openclaw.json - make it the active model (scaffold a baseline if missing).
-o = load(openclaw_path, {
-    "agents": {"defaults": {
-        "workspace": "/home/node/.openclaw/workspace", "models": {}, "model": {}}},
-    "gateway": {"mode": "local",
-                "auth": {"mode": "token", "token": gateway_token()},
-                "port": 18789, "bind": "loopback",
-                "controlUi": {"allowInsecureAuth": True}},
-    "tools": {"profile": "coding"},
-})
+if openclaw_path.exists():
+    o = json.loads(openclaw_path.read_text())
+else:
+    o = {"agents": {"defaults": {"workspace": "/home/node/.openclaw/workspace",
+                                 "models": {}, "model": {}}},
+         "gateway": {"mode": "local",
+                     "auth": {"mode": "token", "token": gateway_token()},
+                     "port": 18789, "bind": "loopback",
+                     "controlUi": {"allowInsecureAuth": True}},
+         "tools": {"profile": "coding"}}
 o.setdefault("agents", {}).setdefault("defaults", {})
 o["agents"]["defaults"]["models"] = {ref: {}}
 o["agents"]["defaults"].setdefault("model", {})["primary"] = ref
-backup_write(openclaw_path, o)
-print(f"    active model set to '{ref}' in {openclaw_path}")
+openclaw_path.parent.mkdir(parents=True, exist_ok=True)
+openclaw_path.write_text(json.dumps(o, indent=2) + "\n")
+print(f"    active model set to '{ref}'")
 PY
+else
+  echo "!! python3 not found - recorded the model in .env, but couldn't set it as the"
+  echo "   active model. Set agents.defaults.model.primary = '$ref' in"
+  echo "   $config_dir/openclaw.json, or run the onboard wizard."
+fi
 
 echo
 echo "Configured Forensic Claw to use $model_name ($ref)."
-echo "Backups written alongside each file as *.bak."
 
 # ---------------------------------------------------------------------------
 # Best-effort Ollama setup: install, bind to all interfaces, pull the model.
@@ -182,7 +169,7 @@ else
 
   if ! command -v ollama >/dev/null 2>&1; then
     echo "!! Ollama still isn't installed. Install it from https://ollama.com/download,"
-    echo "   then re-run:  ./scripts/select-model.sh --choice gemma"
+    echo "   then re-run:  ./scripts/select-model.sh --choice local"
     exit 0
   fi
 

@@ -5,8 +5,8 @@
 #
 # Pass-through args go to `docker compose up`. Common ones:
 #   ./start.sh                  # plain start (prompts for a model on first run)
-#   ./start.sh --select-model   # (re)choose the model: cloud or local Gemma
-#   ./start.sh --model gemma    # switch to local Gemma 4 12B, non-interactive
+#   ./start.sh --select-model   # (re)choose the model: cloud or local
+#   ./start.sh --model local    # switch to the local model (Ollama), non-interactive
 #   ./start.sh --model cloud    # run the cloud onboard wizard
 #   ./start.sh --build          # rebuild image first (after Dockerfile change)
 #   ./start.sh --force-recreate # recreate containers (after .env change)
@@ -41,7 +41,10 @@ fi
 # Model selection. Auto-prompts on first run (no model configured yet); stays
 # silent once a model is set. Force it anytime with --select-model / --model.
 # ---------------------------------------------------------------------------
-config_dir=$(grep -E '^OPENCLAW_CONFIG_DIR=' .env | head -n 1 | cut -d= -f2- || true)
+# cut the value, then strip any trailing inline comment (` # ...`, as docker
+# compose does) and surrounding whitespace.
+config_dir=$(grep -E '^OPENCLAW_CONFIG_DIR=' .env | head -n 1 | cut -d= -f2- \
+  | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' || true)
 config_dir="${config_dir:-./config}"
 openclaw_path="$config_dir/openclaw.json"
 
@@ -61,7 +64,7 @@ if [ "$select_model" -eq 1 ] || [ -n "$model_choice" ]; then
 elif [ -z "$primary" ]; then
   if [ ! -t 0 ]; then
     echo "==> no model configured and this isn't an interactive session." >&2
-    echo "    run:  ./start.sh --model gemma   (or --model cloud)" >&2
+    echo "    run:  ./start.sh --model local   (or --model cloud)" >&2
     exit 1
   fi
   echo
@@ -69,6 +72,8 @@ elif [ -z "$primary" ]; then
   bash scripts/select-model.sh
   model_changed=1
 else
+  # The local Ollama provider is re-registered on every `docker compose up` by
+  # the init-config step, so nothing to re-apply here - just report.
   echo "==> model: $primary  (use ./start.sh --select-model to change)"
 fi
 
@@ -80,7 +85,8 @@ if [ "$model_changed" -eq 1 ]; then
   esac
 fi
 
-gateway_port=$(grep -E '^OPENCLAW_GATEWAY_PORT=' .env | head -n 1 | cut -d= -f2-)
+gateway_port=$(grep -E '^OPENCLAW_GATEWAY_PORT=' .env | head -n 1 | cut -d= -f2- \
+  | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')
 gateway_port="${gateway_port:-18789}"
 
 echo

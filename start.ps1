@@ -2,8 +2,8 @@
 # Runs on Windows PowerShell 5.1+, Windows PS Core (pwsh), and Linux/macOS pwsh.
 # Pass-through args go to `docker compose up`. Common ones:
 #   .\start.ps1                  # plain start (prompts for a model on first run)
-#   .\start.ps1 -SelectModel     # (re)choose the model: cloud or local Gemma
-#   .\start.ps1 -Model gemma     # switch to local Gemma 4 12B, non-interactive
+#   .\start.ps1 -SelectModel     # (re)choose the model: cloud or local
+#   .\start.ps1 -Model local     # switch to the local model (Ollama), non-interactive
 #   .\start.ps1 -Model cloud     # run the cloud onboard wizard
 #   .\start.ps1 --build          # rebuild image first (after Dockerfile change)
 #   .\start.ps1 --force-recreate # recreate containers (after .env change)
@@ -12,8 +12,9 @@
 param(
     # Force the model picker even if one is already configured.
     [switch]$SelectModel,
-    # Pick a model non-interactively: 'cloud' (onboard wizard) or 'gemma'.
-    [ValidateSet('cloud', 'gemma')] [string]$Model,
+    # Pick a model non-interactively: 'cloud' (onboard wizard) or 'local' (Ollama).
+    # 'gemma' is accepted as a deprecated alias for 'local'.
+    [ValidateSet('cloud', 'local', 'gemma')] [string]$Model,
     # Everything else is passed straight through to `docker compose up`.
     [Parameter(ValueFromRemainingArguments = $true)] $ComposeArgs
 )
@@ -42,7 +43,9 @@ $configDir = './config'
 $cfgLine = Get-Content -LiteralPath '.env' |
     Where-Object { $_ -match '^OPENCLAW_CONFIG_DIR=' } | Select-Object -First 1
 if ($cfgLine) {
-    $v = ($cfgLine -replace '^OPENCLAW_CONFIG_DIR=', '').Trim()
+    # Strip the key, any trailing inline comment (` # ...`, like docker compose
+    # does), and surrounding whitespace.
+    $v = (($cfgLine -replace '^OPENCLAW_CONFIG_DIR=', '') -replace '\s+#.*$', '').Trim()
     if (-not [string]::IsNullOrWhiteSpace($v)) { $configDir = $v }
 }
 $openclawPath = Join-Path $configDir 'openclaw.json'
@@ -62,7 +65,7 @@ if ($SelectModel -or $Model) {
 } elseif (-not $primary) {
     if (-not [Environment]::UserInteractive) {
         Write-Output "==> no model configured and this isn't an interactive session."
-        Write-Output "    run:  .\start.ps1 -Model gemma   (or -Model cloud)"
+        Write-Output "    run:  .\start.ps1 -Model local   (or -Model cloud)"
         exit 1
     }
     Write-Output ""
@@ -71,6 +74,8 @@ if ($SelectModel -or $Model) {
     if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
     $modelChanged = $true
 } else {
+    # The local Ollama provider is re-registered on every `docker compose up` by
+    # the init-config step, so nothing to re-apply here - just report.
     Write-Output "==> model: $primary  (use .\start.ps1 -SelectModel to change)"
 }
 
@@ -84,7 +89,7 @@ $portLine = Get-Content -LiteralPath '.env' |
     Where-Object { $_ -match '^OPENCLAW_GATEWAY_PORT=' } |
     Select-Object -First 1
 if ($portLine) {
-    $envPort = $portLine -replace '^OPENCLAW_GATEWAY_PORT=', ''
+    $envPort = (($portLine -replace '^OPENCLAW_GATEWAY_PORT=', '') -replace '\s+#.*$', '').Trim()
     if (-not [string]::IsNullOrWhiteSpace($envPort)) { $port = $envPort }
 }
 

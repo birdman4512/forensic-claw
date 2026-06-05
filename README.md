@@ -13,11 +13,13 @@ Built on top of [OpenClaw](https://github.com/phioranex/openclaw-docker), pre-lo
 ## What you'll need
 
 - **Docker Desktop** (Windows/macOS) or **Docker Engine + Compose v2** (Linux). Check with `docker --version` and `docker compose version`.
-- **An API key** for one model provider:
-  - Anthropic Claude — [console.anthropic.com](https://console.anthropic.com/)
-  - OpenAI — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-
-  Either works. You can switch later by re-running the onboarding wizard.
+- **A model** — either:
+  - **Cloud** (recommended): an API key for one provider —
+    [Anthropic Claude](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/api-keys).
+    Either works, and you can switch later.
+  - **Local** (offline, no API key): a tool-capable model served by [Ollama](https://ollama.com)
+    on the host (default `qwen3:14b`). **Needs a decent discrete GPU** — 12–14B models are
+    unusably slow on integrated-GPU / CPU-only machines. See [docs/run-with-local-model.md](docs/run-with-local-model.md).
 
 - A free TCP port for the dashboard (default `18789`).
 
@@ -59,11 +61,26 @@ OPENCLAW_TZ=Australia/Brisbane
 
 ### 3. Pick your model
 
+On first run, `start.sh` / `start.ps1` prompts you to choose **cloud** or **local**. You can also choose explicitly:
+
+**Cloud (recommended)** — interactive provider/model wizard (detects the key from `.env`):
+
 ```bash
-docker compose run --rm openclaw-cli onboard
+./start.sh --model cloud            # or  .\start.ps1 -Model cloud
+# (equivalently: docker compose run --rm openclaw-cli onboard)
 ```
 
-An interactive wizard. It detects the API key from your `.env`, asks which provider to use, and asks which model. For Claude, pick the latest Sonnet or Opus. For OpenAI, pick GPT-4o or newer. Your choice is saved to `./config/`. Compose will build the image on demand the first time this runs (~3–8 min).
+For Claude pick the latest Sonnet or Opus; for OpenAI pick GPT-4o or newer.
+
+**Local (offline, no API key)** — sets up an [Ollama](https://ollama.com) model on the host:
+
+```bash
+./start.sh --model local            # or  .\start.ps1 -Model local
+```
+
+This records the model in `.env` (`OPENCLAW_LOCAL_MODEL`, default `qwen3:14b`), installs Ollama, pulls the model, and makes it the active model. The model **must support tool-calling** (Gemma 2/3/4 do **not**); good picks: `qwen3:14b`, `qwen2.5-coder:14b`, `llama3.1:8b`. **A discrete GPU is strongly recommended.** Full details and troubleshooting: [docs/run-with-local-model.md](docs/run-with-local-model.md).
+
+Either way your choice is saved to `./config/`. Compose builds the image on demand the first time (~3–8 min).
 
 ### 4. Start it
 
@@ -138,9 +155,12 @@ You can rename, archive, copy out, or zip up the case folder once you're done. I
 docker compose down                                 # take it down
 docker compose logs -f openclaw-gateway             # tail the gateway logs
 docker compose run --rm openclaw-cli dashboard --no-open   # fresh dashboard URL with token
-docker compose run --rm openclaw-cli onboard        # switch model / provider
+./start.sh --select-model                           # switch model: cloud or local (or .\start.ps1 -SelectModel)
+./start.sh --model cloud                            # cloud wizard   |   --model local for an Ollama model
 ./start.sh --build                                  # rebuild image after a Dockerfile change (or .\start.ps1 --build)
 ```
+
+Running a **local model** instead of cloud? See [docs/run-with-local-model.md](docs/run-with-local-model.md).
 
 ### Upgrading to the latest OpenClaw
 
