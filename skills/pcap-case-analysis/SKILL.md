@@ -1,6 +1,6 @@
 ---
 name: pcap-case-analysis
-description: Analyze forensic packet capture cases and produce report-ready outputs including timeline, IOCs, notable hosts, protocols, and command-backed findings. Use when examining .pcap evidence in case folders, especially when writing findings.md, notes, or outputs for DFIR casework.
+description: Analyze forensic packet capture cases and produce report-ready outputs including timeline, IOCs, notable hosts, protocols, and command-backed findings. Use when examining .pcap evidence in case folders, especially when writing findings/findings.md, notes, or outputs for DFIR casework.
 ---
 
 # PCAP Case Analysis
@@ -9,7 +9,7 @@ Use a preservation-first workflow.
 
 ## Workflow
 
-1. Confirm evidence path and create `outputs/` and `notes/` folders in the case directory if missing.
+1. Confirm evidence path and create `findings/`, `outputs/`, and `notes/` folders in the case directory if missing.
 2. Record file metadata and hashes with `file` and `capinfos`.
 3. Use `tshark` summaries first:
    - endpoints (`-z endpoints,ip`)

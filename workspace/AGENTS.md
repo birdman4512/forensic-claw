@@ -39,7 +39,7 @@ Use this workspace for lawful, defensive, and authorized DFIR work:
 - Maintain these files for active work:
   - `brief.md`
   - `status.json`
-  - `findings.md`
+  - `findings/findings.md`
   - `notes/worklog.md`
   - `evidence/`
   - `outputs/`
@@ -61,7 +61,8 @@ See `CASE-OPERATIONS.md` for the required case structure and status fields.
   - `tools/run-nuclei-tool.sh [args...]`
 - All wrappers auto-log every invocation (timestamp + cwd + image + command + exit code) to `/home/node/.openclaw/logs/tool-command-history.md` (host: `${OPENCLAW_LOGS_DIR:-./logs}/tool-command-history.md`).
 - Inside the tool sub-containers, the case root is mounted at `/cases`, so use `/cases/<case-id>/...` in args. For in-image tools, use the gateway path `/home/node/.openclaw/cases/<case-id>/...`.
-- Save tool outputs under the active case `outputs/` folder where possible.
+- Save report-ready findings under the active case `findings/` folder.
+- Save tool outputs and extracted artefacts under the active case `outputs/` folder where possible.
 - Keep `TOOLS-AVAILABLE.md`, `tools/USAGE.md`, and relevant skills up to date when tooling or workflow changes.
 - For notable runs, also append a richer entry (scope/authorization, output files, result summary, follow-up) to the active case `notes/worklog.md`. Record failures too.
 - When a run teaches a reusable pattern, caveat, limitation, or better invocation, update the relevant `skills/forensic-tool-*/SKILL.md` page.

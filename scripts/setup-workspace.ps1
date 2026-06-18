@@ -28,12 +28,18 @@ if (-not (Test-Path -LiteralPath 'cases/EXAMPLE-001')) {
     New-Item -ItemType Directory -Force -Path `
         'cases/EXAMPLE-001/notes', `
         'cases/EXAMPLE-001/evidence', `
+        'cases/EXAMPLE-001/findings', `
         'cases/EXAMPLE-001/outputs' | Out-Null
-    foreach ($f in @('brief.md', 'findings.md', 'status.json')) {
+    foreach ($f in @('brief.md', 'status.json')) {
         $src = "cases/templates/$f"
         if (Test-Path -LiteralPath $src) {
             Copy-Item -LiteralPath $src -Destination "cases/EXAMPLE-001/$f"
         }
+    }
+    if (Test-Path -LiteralPath 'cases/templates/findings/findings.md') {
+        Copy-Item -LiteralPath 'cases/templates/findings/findings.md' -Destination 'cases/EXAMPLE-001/findings/findings.md'
+    } elseif (Test-Path -LiteralPath 'cases/templates/findings.md') {
+        Copy-Item -LiteralPath 'cases/templates/findings.md' -Destination 'cases/EXAMPLE-001/findings/findings.md'
     }
     if (Test-Path -LiteralPath 'cases/templates/worklog.md') {
         Copy-Item -LiteralPath 'cases/templates/worklog.md' -Destination 'cases/EXAMPLE-001/notes/worklog.md'

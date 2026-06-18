@@ -13,7 +13,7 @@ This is bind-mounted from `${OPENCLAW_CASES_DIR:-./cases}` on the host. Layout i
 Expected structure for an active case:
 - `/home/node/.openclaw/cases/<case-id>/brief.md`
 - `/home/node/.openclaw/cases/<case-id>/status.json`
-- `/home/node/.openclaw/cases/<case-id>/findings.md`
+- `/home/node/.openclaw/cases/<case-id>/findings/findings.md`
 - `/home/node/.openclaw/cases/<case-id>/notes/worklog.md`
 - `/home/node/.openclaw/cases/<case-id>/evidence/`
 - `/home/node/.openclaw/cases/<case-id>/outputs/`
@@ -31,7 +31,7 @@ Use `tools/new-case.sh <case-id>` to seed this structure from the templates in `
    - a notable finding is made
    - the work is blocked
    - the work completes
-5. Keep `findings.md` as the report-ready findings summary in the case folder.
+5. Keep `findings/findings.md` as the report-ready findings summary in the case folder.
 6. Never leave progress only in chat.
 7. Do not use the workspace as the primary storage location for case status, findings, or worklog state.
 
@@ -70,7 +70,8 @@ The canonical schema lives in `/home/node/.openclaw/cases/templates/status.json`
   "lastUpdatedBy": "forensic-claw",
   "outputs": {
     "brief": "brief.md",
-    "findings": "findings.md",
+    "findings": "findings/findings.md",
+    "findingsDir": "findings/",
     "notesDir": "notes/",
     "outputsDir": "outputs/"
   },

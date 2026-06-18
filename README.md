@@ -119,9 +119,9 @@ Make a folder under `./cases/` named however you like (`CASE-001`, `incident-202
 
 Open the dashboard, start a new conversation, point the agent at `cases/`, and tell it what you want answered. For example:
 
-> "Look at what's under `cases/`. There's an OT-PCAP folder with three packet captures. Identify any unusual traffic, build a timeline of attacker activity, and answer: (1) what was the initial entry vector, (2) which hosts were involved, (3) was any data exfiltrated. Put findings in `findings.md`."
+> "Look at what's under `cases/`. There's an OT-PCAP folder with three packet captures. Identify any unusual traffic, build a timeline of attacker activity, and answer: (1) what was the initial entry vector, (2) which hosts were involved, (3) was any data exfiltrated. Put findings in `findings/findings.md`."
 
-The agent will set up the standard case scaffolding (`brief.md`, `status.json`, `findings.md`, `notes/worklog.md`, `evidence/`, `outputs/`) the first time it touches a case folder — you don't need to pre-create those files.
+The agent will set up the standard case scaffolding (`brief.md`, `status.json`, `findings/findings.md`, `notes/worklog.md`, `evidence/`, `outputs/`) the first time it touches a case folder — you don't need to pre-create those files.
 
 The agent will:
 
@@ -129,7 +129,7 @@ The agent will:
 - Pick the right tool (tshark, Volatility, Plaso, exiftool, etc.) and call it via the **wrappers** in `workspace/tools/`. Every tool invocation is auto-logged.
 - Save substantive output (extracted artefacts, generated timelines, parsed logs) into the case `outputs/` folder.
 - Append a chronological log of what it did to `notes/worklog.md`.
-- Write report-ready findings into `findings.md`.
+- Write report-ready findings into the case `findings/` folder.
 - Update `status.json` as it makes progress.
 
 You stay in the loop the whole time — the dashboard shows what the agent is doing and you can interject, redirect, or stop at any point.
@@ -138,7 +138,7 @@ You stay in the loop the whole time — the dashboard shows what the agent is do
 
 When the agent says it's done (or you're satisfied), open the case folder:
 
-- **`findings.md`** — the report-ready summary you'd hand to a stakeholder.
+- **`findings/`** — report-ready findings you'd hand to a stakeholder.
 - **`notes/worklog.md`** — chronological log of every step, in case anyone asks "how did you arrive at that?"
 - **`outputs/`** — extracted artefacts, timelines, parsed logs.
 - **`status.json`** — current state machine-readable.

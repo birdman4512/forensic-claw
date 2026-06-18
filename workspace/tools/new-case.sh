@@ -2,10 +2,10 @@
 # Create a standard case folder under the cases root, seeded from templates.
 # Layout (flat, no doubled `cases/` segment):
 #   <cases-root>/
-#   ├── templates/         (brief.md, findings.md, status.json, worklog.md)
+#   ├── templates/         (brief.md, findings/findings.md, status.json, worklog.md)
 #   └── <case-id>/
 #       ├── brief.md
-#       ├── findings.md
+#       ├── findings/findings.md
 #       ├── status.json
 #       ├── notes/worklog.md
 #       ├── evidence/
@@ -23,9 +23,9 @@ ROOT="${FORENSIC_CLAW_CASE_ROOT:-/home/node/.openclaw/cases}"
 CASE_DIR="$ROOT/$CASE_ID"
 TEMPLATE_DIR="$ROOT/templates"
 
-mkdir -p "$CASE_DIR/notes" "$CASE_DIR/evidence" "$CASE_DIR/outputs"
+mkdir -p "$CASE_DIR/notes" "$CASE_DIR/evidence" "$CASE_DIR/findings" "$CASE_DIR/outputs"
 
-for f in brief.md findings.md status.json; do
+for f in brief.md status.json; do
   if [ ! -e "$CASE_DIR/$f" ]; then
     if [ -e "$TEMPLATE_DIR/$f" ]; then
       cp "$TEMPLATE_DIR/$f" "$CASE_DIR/$f"
@@ -34,6 +34,16 @@ for f in brief.md findings.md status.json; do
     fi
   fi
 done
+
+if [ ! -e "$CASE_DIR/findings/findings.md" ]; then
+  if [ -e "$TEMPLATE_DIR/findings/findings.md" ]; then
+    cp "$TEMPLATE_DIR/findings/findings.md" "$CASE_DIR/findings/findings.md"
+  elif [ -e "$TEMPLATE_DIR/findings.md" ]; then
+    cp "$TEMPLATE_DIR/findings.md" "$CASE_DIR/findings/findings.md"
+  else
+    touch "$CASE_DIR/findings/findings.md"
+  fi
+fi
 
 if [ ! -e "$CASE_DIR/notes/worklog.md" ]; then
   if [ -e "$TEMPLATE_DIR/worklog.md" ]; then

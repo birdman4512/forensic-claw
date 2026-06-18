@@ -26,10 +26,15 @@ shopt -u nullglob
 
 echo "==> seeding cases/EXAMPLE-001 from cases/templates/ (if missing)"
 if [ ! -d cases/EXAMPLE-001 ]; then
-  mkdir -p cases/EXAMPLE-001/notes cases/EXAMPLE-001/evidence cases/EXAMPLE-001/outputs
-  for f in brief.md findings.md status.json; do
+  mkdir -p cases/EXAMPLE-001/notes cases/EXAMPLE-001/evidence cases/EXAMPLE-001/findings cases/EXAMPLE-001/outputs
+  for f in brief.md status.json; do
     [ -f "cases/templates/$f" ] && cp "cases/templates/$f" "cases/EXAMPLE-001/$f"
   done
+  if [ -f cases/templates/findings/findings.md ]; then
+    cp cases/templates/findings/findings.md cases/EXAMPLE-001/findings/findings.md
+  elif [ -f cases/templates/findings.md ]; then
+    cp cases/templates/findings.md cases/EXAMPLE-001/findings/findings.md
+  fi
   [ -f cases/templates/worklog.md ] && cp cases/templates/worklog.md cases/EXAMPLE-001/notes/worklog.md
   echo "    seeded cases/EXAMPLE-001/"
 else
