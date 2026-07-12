@@ -5,15 +5,7 @@ description: Use vol2 in Forensic Claw for lawful DFIR, cyber security, evidence
 
 # forensic-tool-vol2
 
-Volatility 2 output is usually verbose. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself:
-
-```bash
-tools/delegate-to-local-analyst.sh \
-  "Run tools/run-vol2-tool.sh -f /cases/<case-id>/evidence/mem.raw imageinfo. Report the identified profile and anything unusual." \
-  600
-```
-
-Run it yourself only when you need to inspect exact raw output, need a fast turnaround, or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command, runs an upstream Volatility 2 image via Docker), from the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs an upstream Volatility 2 image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-vol2-tool.sh [args...]

@@ -1,27 +1,29 @@
 # Forensic Claw - unified model selector (PowerShell).
 #
-# OpenClaw's built-in `onboard` wizard only knows the two CLOUD providers
-# (Anthropic / OpenAI) and has no option for a local model. This wrapper adds
-# that choice: pick a cloud provider (it just delegates to `onboard`) or the
-# LOCAL Gemma 4 12B provider served by Ollama (it writes ./config/ directly).
+# Forensic Claw can run on a CLOUD model (Anthropic / OpenAI via OpenClaw's
+# `onboard` wizard) or a LOCAL model served by Ollama on the host. This wrapper
+# offers both:
+#   - cloud: delegates to `onboard`.
+#   - local: records the model in .env (the docker-compose `init-config` step
+#            registers the Ollama provider on every start), sets it as the
+#            active model, then installs Ollama + pulls the model on the host.
 #
 # Usage:
 #   .\scripts\select-model.ps1                 # interactive menu
 #   .\scripts\select-model.ps1 -Choice cloud   # run the onboard wizard
-#   .\scripts\select-model.ps1 -Choice gemma   # configure local Gemma 4 12B
-#   .\scripts\select-model.ps1 -Choice gemma -Model 'gemma4:27b' -ModelName 'Gemma 4 27B'
+#   .\scripts\select-model.ps1 -Choice local   # configure the local model (Ollama)
+#   .\scripts\select-model.ps1 -Choice local -Model 'qwen2.5-coder:14b' -ModelName 'Qwen2.5 Coder 14B'
 #
-# After choosing Gemma, make sure Ollama is installed and serving the model
-# (see docs/run-with-gemma-4-12b.md), then restart the gateway:
-#   docker compose up -d --force-recreate openclaw-gateway
+# The local model MUST support tool-calling (the agent needs tools) - Gemma 2/3/4
+# do NOT. Good choices: qwen3:14b (default), qwen2.5-coder:14b, llama3.1:8b.
+# See docs/run-with-local-model.md for hardware notes (a discrete GPU is strongly
+# recommended; 12-14B models are unusably slow on integrated-GPU / CPU-only).
 
 param(
-    [ValidateSet('cloud', 'gemma')] [string]$Choice,
-    [string]$Model = 'gemma4:12b',
-    [string]$ModelName = 'Gemma 4 12B (local)',
-    [string]$OllamaUrl = 'http://host.docker.internal:11434/v1',
-    [int]$ContextWindow = 128000,
-    [int]$MaxTokens = 8192,
+    # 'gemma' is accepted as a deprecated alias for 'local'.
+    [ValidateSet('cloud', 'local', 'gemma')] [string]$Choice,
+    [string]$Model = 'qwen3:14b',
+    [string]$ModelName = 'Qwen3 14B (local)',
     # Override config dir (defaults to OPENCLAW_CONFIG_DIR in .env, else ./config).
     [string]$ConfigDir,
     # Skip the install-Ollama / pull-model / bind-host automation (config only).
@@ -31,19 +33,34 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
+function Get-EnvValue {
+    # Read KEY from .env, stripping any trailing inline comment.
+    param([string]$Key)
+    if (-not (Test-Path -LiteralPath '.env')) { return $null }
+    $line = Get-Content -LiteralPath '.env' |
+        Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
+    if (-not $line) { return $null }
+    return (($line -replace "^$([regex]::Escape($Key))=", '') -replace '\s+#.*$', '').Trim()
+}
+
+function Set-EnvValue {
+    # Replace or append KEY=Value in .env (UTF-8, no BOM, LF line endings).
+    param([string]$Key, [string]$Value)
+    $lines = if (Test-Path -LiteralPath '.env') { @(Get-Content -LiteralPath '.env') } else { @() }
+    $pattern = "^$([regex]::Escape($Key))="
+    $found = $false
+    $out = foreach ($l in $lines) { if ($l -match $pattern) { $found = $true; "$Key=$Value" } else { $l } }
+    if (-not $found) { $out = @($out) + "$Key=$Value" }
+    $enc = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText((Join-Path (Get-Location).ProviderPath '.env'), (($out -join "`n") + "`n"), $enc)
+}
+
 # ---------------------------------------------------------------------------
 # Resolve the config directory (mirrors docker-compose's OPENCLAW_CONFIG_DIR).
 # ---------------------------------------------------------------------------
 if (-not $ConfigDir) {
-    $ConfigDir = './config'
-    if (Test-Path -LiteralPath '.env') {
-        $line = Get-Content -LiteralPath '.env' |
-            Where-Object { $_ -match '^OPENCLAW_CONFIG_DIR=' } | Select-Object -First 1
-        if ($line) {
-            $v = ($line -replace '^OPENCLAW_CONFIG_DIR=', '').Trim()
-            if (-not [string]::IsNullOrWhiteSpace($v)) { $ConfigDir = $v }
-        }
-    }
+    $ConfigDir = Get-EnvValue 'OPENCLAW_CONFIG_DIR'
+    if ([string]::IsNullOrWhiteSpace($ConfigDir)) { $ConfigDir = './config' }
 }
 
 # ---------------------------------------------------------------------------
@@ -52,14 +69,15 @@ if (-not $ConfigDir) {
 if (-not $Choice) {
     Write-Output "Select the model Forensic Claw should use:"
     Write-Output "  [1] Cloud provider (Anthropic / OpenAI)  - runs the onboard wizard"
-    Write-Output "  [2] Local Gemma 4 12B via Ollama         - offline, no API key"
+    Write-Output "  [2] Local model via Ollama ($Model)      - offline, no API key, needs a good GPU"
     $sel = Read-Host "Enter 1 or 2"
     switch ($sel.Trim()) {
         '1' { $Choice = 'cloud' }
-        '2' { $Choice = 'gemma' }
+        '2' { $Choice = 'local' }
         default { Write-Output "Invalid choice '$sel' - aborting."; exit 1 }
     }
 }
+if ($Choice -eq 'gemma') { $Choice = 'local' }   # deprecated alias
 
 # ---------------------------------------------------------------------------
 # Cloud path: hand off to the upstream wizard unchanged.
@@ -71,11 +89,11 @@ if ($Choice -eq 'cloud') {
 }
 
 # ---------------------------------------------------------------------------
-# Gemma path: write the provider + active-model selection into ./config/.
+# Local path. The Ollama provider itself is registered by docker-compose's
+# init-config step (reading OPENCLAW_LOCAL_MODEL); here we just record the
+# choice and make it the active model.
 # ---------------------------------------------------------------------------
-$providerId = 'ollama'
-$ref = "$providerId/$Model"
-$modelsPath = Join-Path $ConfigDir 'agents/main/agent/models.json'
+$ref = "ollama/$Model"
 $openclawPath = Join-Path $ConfigDir 'openclaw.json'
 
 function Write-JsonNoBom {
@@ -83,65 +101,28 @@ function Write-JsonNoBom {
     $full = if ([System.IO.Path]::IsPathRooted($Path)) { $Path }
             else { Join-Path (Get-Location).ProviderPath $Path }
     $full = [System.IO.Path]::GetFullPath($full)
-    if (Test-Path -LiteralPath $full) {
-        Copy-Item -LiteralPath $full -Destination "$full.bak" -Force
-    }
+    if (Test-Path -LiteralPath $full) { Copy-Item -LiteralPath $full -Destination "$full.bak" -Force }
     $dir = Split-Path -Parent $full
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-    $json = $Object | ConvertTo-Json -Depth 40
     $enc = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($full, $json, $enc)
+    [System.IO.File]::WriteAllText($full, ($Object | ConvertTo-Json -Depth 40), $enc)
 }
 
 function New-GatewayToken {
-    # Reuse the token already in .env if present so config + env stay in sync;
-    # otherwise generate a fresh 64-hex-char one (matches setup-workspace).
-    if (Test-Path -LiteralPath '.env') {
-        $tl = Get-Content -LiteralPath '.env' |
-            Where-Object { $_ -match '^OPENCLAW_GATEWAY_TOKEN=' } | Select-Object -First 1
-        if ($tl) {
-            $t = ($tl -replace '^OPENCLAW_GATEWAY_TOKEN=', '').Trim()
-            if (-not [string]::IsNullOrWhiteSpace($t) -and $t -notmatch '(^|\s)#') { return $t }
-        }
-    }
+    $t = Get-EnvValue 'OPENCLAW_GATEWAY_TOKEN'
+    if (-not [string]::IsNullOrWhiteSpace($t)) { return $t }
     $b = New-Object byte[] 32
     $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try { $rng.GetBytes($b) } finally { $rng.Dispose() }
     return (-join ($b | ForEach-Object { '{0:x2}' -f $_ }))
 }
 
-# models.json - load existing or start a fresh provider map (config/ is
-# gitignored, so a brand-new clone has none yet).
-Write-Output "==> adding '$providerId' provider ($Model) to $modelsPath"
-if (Test-Path -LiteralPath $modelsPath) {
-    $m = Get-Content -Raw -LiteralPath $modelsPath | ConvertFrom-Json
-} else {
-    Write-Output "    (no models.json yet - creating one)"
-    $m = [pscustomobject]@{ providers = [pscustomobject]@{} }
-}
-if (-not ($m.PSObject.Properties.Name -contains 'providers')) {
-    $m | Add-Member -NotePropertyName 'providers' -NotePropertyValue ([pscustomobject]@{}) -Force
-}
-$ollama = [ordered]@{
-    baseUrl = $OllamaUrl
-    apiKey  = 'ollama'
-    auth    = 'api_key'
-    api     = 'openai-completions'
-    models  = @(
-        [ordered]@{
-            id            = $Model
-            name          = $ModelName
-            api           = 'openai-completions'
-            input         = @('text', 'image')
-            cost          = [ordered]@{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }
-            contextWindow = $ContextWindow
-            maxTokens     = $MaxTokens
-        }
-    )
-}
-$m.providers | Add-Member -NotePropertyName $providerId -NotePropertyValue $ollama -Force
-Write-JsonNoBom $m $modelsPath
+# 1. Record the model in .env so init-config registers the matching provider.
+Write-Output "==> recording local model in .env (OPENCLAW_LOCAL_MODEL=$Model)"
+Set-EnvValue 'OPENCLAW_LOCAL_MODEL' $Model
+Set-EnvValue 'OPENCLAW_LOCAL_MODEL_NAME' $ModelName
 
+# 2. Make it the active model in openclaw.json (scaffold a baseline if missing).
 Write-Output "==> setting active model to '$ref' in $openclawPath"
 if (Test-Path -LiteralPath $openclawPath) {
     $o = Get-Content -Raw -LiteralPath $openclawPath | ConvertFrom-Json
@@ -166,15 +147,12 @@ if (Test-Path -LiteralPath $openclawPath) {
 if (-not $o.agents.defaults.model) {
     $o.agents.defaults | Add-Member -NotePropertyName 'model' -NotePropertyValue ([pscustomobject]@{}) -Force
 }
-# Add-Member -Force adds-or-overwrites, so this works whether the property
-# already exists (existing config) or not (freshly scaffolded baseline).
 $o.agents.defaults | Add-Member -NotePropertyName 'models' -NotePropertyValue ([pscustomobject]@{ $ref = [pscustomobject]@{} }) -Force
 $o.agents.defaults.model | Add-Member -NotePropertyName 'primary' -NotePropertyValue $ref -Force
 Write-JsonNoBom $o $openclawPath
 
 Write-Output ""
 Write-Output "Configured Forensic Claw to use $ModelName ($ref)."
-Write-Output "Backups written alongside each file as *.bak."
 
 # ---------------------------------------------------------------------------
 # Best-effort Ollama setup: install (Windows/winget), bind to all interfaces
@@ -213,7 +191,7 @@ else {
             Write-Output ""
             Write-Output "!! Ollama isn't installed and couldn't be auto-installed here."
             Write-Output "   Install it from https://ollama.com/download, then re-run:"
-            Write-Output "     .\scripts\select-model.ps1 -Choice gemma"
+            Write-Output "     .\scripts\select-model.ps1 -Choice local"
             return
         }
     }
@@ -227,11 +205,18 @@ else {
         Write-Output "   (a running Ollama must be restarted to pick up the new bind address)"
     }
 
-    # 3. Pull the model.
+    # 3. Pull the model. Ollama writes progress and warnings to stderr; with
+    # $ErrorActionPreference='Stop' and a redirected/merged stream those lines
+    # get wrapped as terminating NativeCommandErrors, which would abort the pull
+    # on the first warning. Relax it just for this native call.
     Write-Output "==> pulling $Model (first run downloads several GB)"
-    & $ollama pull $Model
+    $eapBak = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $ollama pull $Model } finally { $ErrorActionPreference = $eapBak }
     if ($LASTEXITCODE -ne 0) {
         Write-Output "!! 'ollama pull $Model' failed - check the model tag and that Ollama is running."
+        # Best-effort: don't let a failed pull abort the caller (start.ps1).
+        $global:LASTEXITCODE = 0
     }
 }
 

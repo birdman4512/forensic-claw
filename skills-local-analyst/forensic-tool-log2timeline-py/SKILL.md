@@ -5,15 +5,7 @@ description: Use log2timeline.py in Forensic Claw for lawful DFIR, cyber securit
 
 # forensic-tool-log2timeline.py
 
-log2timeline.py's run output (progress/status logging over a large source) can be very verbose, and the run itself can be slow. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself, with a generous timeout:
-
-```bash
-tools/delegate-to-local-analyst.sh \
-  "Run tools/run-plaso-tool.sh log2timeline.py /cases/<case-id>/outputs/timeline.plaso /cases/<case-id>/evidence/source. Report scope covered, errors, and notable warnings." \
-  1800
-```
-
-Run it yourself only when you need to inspect exact raw output, need a fast turnaround, or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command, runs the upstream `log2timeline/plaso` image via Docker), from the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs the upstream `log2timeline/plaso` image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-plaso-tool.sh log2timeline.py [args...]

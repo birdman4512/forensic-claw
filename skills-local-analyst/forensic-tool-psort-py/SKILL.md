@@ -5,15 +5,7 @@ description: Use psort.py in Forensic Claw for lawful DFIR, cyber security, evid
 
 # forensic-tool-psort.py
 
-The exported timeline can be tens of thousands of lines. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself, with a generous timeout:
-
-```bash
-tools/delegate-to-local-analyst.sh \
-  "Run tools/run-plaso-tool.sh psort.py -o l2tcsv -w /cases/<case-id>/outputs/timeline.csv /cases/<case-id>/outputs/timeline.plaso. Report notable events and anomalies in the timeline." \
-  1800
-```
-
-Run it yourself only when you need to inspect exact raw output, need a fast turnaround, or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command, runs the upstream `log2timeline/plaso` image via Docker), from the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs the upstream `log2timeline/plaso` image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-plaso-tool.sh psort.py [args...]

@@ -5,15 +5,7 @@ description: Use memprocfs in Forensic Claw for lawful DFIR, cyber security, evi
 
 # forensic-tool-memprocfs
 
-MemProcFS output can be large. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself:
-
-```bash
-tools/delegate-to-local-analyst.sh \
-  "Run tools/run-memprocfs-tool.sh <args>. Report notable findings and a one-line summary." \
-  600
-```
-
-Run it yourself only when you need to inspect exact raw output, need a fast turnaround, or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command, runs an upstream MemProcFS image via Docker), from the workspace `/home/node/.openclaw/workspace`:
+Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command and runs an upstream MemProcFS image via Docker). From the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-memprocfs-tool.sh [args...]

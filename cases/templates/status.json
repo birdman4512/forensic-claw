@@ -18,7 +18,8 @@
   "lastUpdatedBy": "forensic-claw",
   "outputs": {
     "brief": "brief.md",
-    "findings": "findings.md",
+    "findings": "findings/findings.md",
+    "findingsDir": "findings/",
     "notesDir": "notes/",
     "outputsDir": "outputs/"
   },

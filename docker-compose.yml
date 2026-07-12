@@ -28,8 +28,212 @@ services:
       - ${OPENCLAW_LOGS_DIR:-./logs}:/mnt/logs
     entrypoint: ["sh", "-c"]
     command:
-      - 'chown 1000:1000 /mnt/config /mnt/workspace /mnt/skills /mnt/cases /mnt/logs'
+      - 'chown -R 1000:1000 /mnt/config /mnt/workspace /mnt/skills /mnt/cases /mnt/logs'
     restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # init-config – one-shot helper that ensures the ollama provider is present
+  # in models.json before the gateway starts. The gateway rewrites this file
+  # with cloud-only defaults on first clean init, so we merge the ollama block
+  # in every time via jq, preserving any other providers already there.
+  # ---------------------------------------------------------------------------
+  init-config:
+    image: alpine:3.20
+    user: root
+    depends_on:
+      init-perms:
+        condition: service_completed_successfully
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./config}:/mnt/config
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        apk add --quiet --no-cache jq
+        CFG=/mnt/config/openclaw.json
+        AUTH=/mnt/config/agents/main/agent/auth-profiles.json
+        MODEL="${OPENCLAW_LOCAL_MODEL:-qwen3:14b}"
+        MODEL_NAME="${OPENCLAW_LOCAL_MODEL_NAME:-Qwen3 14B (local)}"
+        REF="ollama/$$MODEL"
+        mkdir -p "$$(dirname "$$CFG")" "$$(dirname "$$AUTH")"
+        [ -f "$$CFG" ]  || echo '{}' > "$$CFG"
+        [ -f "$$AUTH" ] || echo '{"version":1,"profiles":{}}' > "$$AUTH"
+        # Register the local Ollama provider under models.providers (where the
+        # gateway's model resolver reads it) using the NATIVE "ollama" api, which
+        # grants the host-network SSRF exemption needed to reach the host from the
+        # container. Idempotent; does NOT change the active model - that is the
+        # user's choice (local vs cloud) made by select-model / onboard.
+        PROVIDER=$$(jq -n --arg model "$$MODEL" --arg name "$$MODEL_NAME" '{
+          baseUrl: "http://host.docker.internal:11434", api: "ollama", apiKey: "ollama",
+          timeoutSeconds: 600,
+          models: [ { id: $$model, name: $$name, input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 40960, maxTokens: 8192 } ]
+        }')
+        jq --argjson p "$$PROVIDER" --arg ref "$$REF" '
+          .models = (.models // {}) | .models.providers = (.models.providers // {}) |
+          .models.providers.ollama = $$p |
+          .agents = (.agents // {}) | .agents.defaults = (.agents.defaults // {}) |
+          .agents.defaults.models = (.agents.defaults.models // {}) |
+          .agents.defaults.models[$$ref] = (.agents.defaults.models[$$ref] // {}) |
+          .auth = (.auth // {}) | .auth.profiles = (.auth.profiles // {}) |
+          .auth.profiles["ollama:default"] = { provider: "ollama", mode: "api_key" }
+        ' "$$CFG" > "$$CFG.tmp" && mv "$$CFG.tmp" "$$CFG"
+        # Ollama ignores the key, but the gateway requires an auth profile for a
+        # non-loopback host (host.docker.internal), so seed a placeholder.
+        jq '.version = (.version // 1) | .profiles = (.profiles // {}) |
+          .profiles["ollama:default"] = { type: "api_key", provider: "ollama", key: "ollama" }
+        ' "$$AUTH" > "$$AUTH.tmp" && mv "$$AUTH.tmp" "$$AUTH"
+        echo "local Ollama provider ($$MODEL) ensured in $$CFG"
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # init-perms-local – same ownership fix as init-perms, scoped to the
+  # local-analyst gateway's own config + curated skills directories (its
+  # workspace/cases/logs are shared with main and already chowned above).
+  # ---------------------------------------------------------------------------
+  init-perms-local:
+    image: alpine:3.20
+    user: root
+    volumes:
+      - ${OPENCLAW_LOCAL_ANALYST_CONFIG_DIR:-./config-local-analyst}:/mnt/config
+      - ${OPENCLAW_LOCAL_ANALYST_SKILLS_DIR:-./skills-local-analyst}:/mnt/skills
+    entrypoint: ["sh", "-c"]
+    command:
+      - 'chown -R 1000:1000 /mnt/config /mnt/skills'
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # init-config-local – same idea as init-config, but for the local-analyst
+  # gateway's own isolated config dir. Unlike main, this gateway has exactly
+  # one job (be the local delegate), so it also sets model.primary directly
+  # instead of leaving that to onboarding/select-model.
+  # ---------------------------------------------------------------------------
+  init-config-local:
+    image: alpine:3.20
+    user: root
+    depends_on:
+      init-perms-local:
+        condition: service_completed_successfully
+    volumes:
+      - ${OPENCLAW_LOCAL_ANALYST_CONFIG_DIR:-./config-local-analyst}:/mnt/config
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        apk add --quiet --no-cache jq
+        CFG=/mnt/config/openclaw.json
+        AUTH=/mnt/config/agents/main/agent/auth-profiles.json
+        MODEL="${OPENCLAW_LOCAL_ANALYST_MODEL:-qwen3:1.7b-longctx}"
+        MODEL_NAME="${OPENCLAW_LOCAL_ANALYST_MODEL_NAME:-Local Analyst (Qwen3 1.7B, 16K ctx)}"
+        REF="ollama/$$MODEL"
+        mkdir -p "$$(dirname "$$CFG")" "$$(dirname "$$AUTH")"
+        [ -f "$$CFG" ]  || echo '{}' > "$$CFG"
+        [ -f "$$AUTH" ] || echo '{"version":1,"profiles":{}}' > "$$AUTH"
+        # Use the resolved IP literal, not the "host.docker.internal" hostname:
+        # the gateway's idle-timeout watchdog only recognizes local/private
+        # providers by literal IP (no DNS resolution - see
+        # isLocalProviderBaseUrl in the gateway source), and a plain hostname
+        # gets treated as "remote", capping every request at a short generic
+        # idle timeout regardless of timeoutSeconds below - way too short for
+        # CPU-only prompt processing on a multi-thousand-token system prompt.
+        OLLAMA_IP="${OPENCLAW_LOCAL_ANALYST_OLLAMA_HOST_IP:-192.168.65.254}"
+        PROVIDER=$$(jq -n --arg model "$$MODEL" --arg name "$$MODEL_NAME" --arg ip "$$OLLAMA_IP" '{
+          baseUrl: ("http://" + $$ip + ":11434"), api: "ollama", apiKey: "ollama",
+          timeoutSeconds: 600,
+          models: [ { id: $$model, name: $$name, input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 16384, maxTokens: 8192 } ]
+        }')
+        jq --argjson p "$$PROVIDER" --arg ref "$$REF" '
+          .models = (.models // {}) | .models.providers = (.models.providers // {}) |
+          .models.providers.ollama = $$p |
+          .agents = (.agents // {}) | .agents.defaults = (.agents.defaults // {}) |
+          .agents.defaults.model = (.agents.defaults.model // {}) |
+          .agents.defaults.model.primary = $$ref |
+          .agents.defaults.models = (.agents.defaults.models // {}) |
+          .agents.defaults.models[$$ref] = (.agents.defaults.models[$$ref] // {}) |
+          .auth = (.auth // {}) | .auth.profiles = (.auth.profiles // {}) |
+          .auth.profiles["ollama:default"] = { provider: "ollama", mode: "api_key" }
+        ' "$$CFG" > "$$CFG.tmp" && mv "$$CFG.tmp" "$$CFG"
+        jq '.version = (.version // 1) | .profiles = (.profiles // {}) |
+          .profiles["ollama:default"] = { type: "api_key", provider: "ollama", key: "ollama" }
+        ' "$$AUTH" > "$$AUTH.tmp" && mv "$$AUTH.tmp" "$$AUTH"
+        echo "local-analyst Ollama provider ($$MODEL) ensured in $$CFG"
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # openclaw-gateway-local – a second, fully isolated OpenClaw gateway that
+  # only ever runs the local Ollama model. It shares the main gateway's
+  # workspace (tools/, IDENTITY.md, AGENTS.md) and cases (evidence) directly,
+  # but has its OWN config dir and its OWN curated skills directory
+  # (skills-local-analyst/ - just the verbose forensic tools worth delegating:
+  # vol, vol2, memprocfs, tshark, pyshark, log2timeline.py, psort.py). That
+  # keeps its system prompt small enough to fit the model's context window.
+  #
+  # The main agent delegates to it via workspace/tools/delegate-to-local-analyst.sh,
+  # which `docker exec`s into this container's own CLI (using the docker
+  # socket already mounted into openclaw-gateway) rather than talking to it
+  # over the network - simplest way to run one agent turn and get the reply.
+  # ---------------------------------------------------------------------------
+  openclaw-gateway-local:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-ghcr.io/phioranex/openclaw-docker:latest}
+    image: openclaw-custom:latest          # reuses the same built image
+    container_name: forensic-claw-local-analyst
+    env_file: .env
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      TZ: ${OPENCLAW_TZ:-Australia/Brisbane}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
+      OPENCLAW_DISABLE_BONJOUR: ${OPENCLAW_DISABLE_BONJOUR:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      FORENSIC_CLAW_LOG_DIR: /home/node/.openclaw/logs
+      FORENSIC_CLAW_CASE_ROOT: /home/node/.openclaw/cases
+      FORENSIC_CLAW_CASES_HOST_DIR: ${OPENCLAW_CASES_HOST_PATH:-}
+      FORENSIC_CLAW_PLASO_IMAGE: ${FORENSIC_CLAW_PLASO_IMAGE:-log2timeline/plaso:latest}
+      FORENSIC_CLAW_VOL2_IMAGE: ${FORENSIC_CLAW_VOL2_IMAGE:-blacktop/volatility:2.6}
+      FORENSIC_CLAW_MEMPROCFS_IMAGE: ${FORENSIC_CLAW_MEMPROCFS_IMAGE:-forensic-claw-memprocfs:latest}
+      FORENSIC_CLAW_NUCLEI_IMAGE: ${FORENSIC_CLAW_NUCLEI_IMAGE:-projectdiscovery/nuclei:latest}
+    volumes:
+      # Own isolated config/session/auth state - never shared with main.
+      - ${OPENCLAW_LOCAL_ANALYST_CONFIG_DIR:-./config-local-analyst}:/home/node/.openclaw
+      # Shared with main: same tool wrappers, IDENTITY.md/AGENTS.md, and cases.
+      - ${OPENCLAW_WORKSPACE_DIR:-./workspace}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CASES_DIR:-./cases}:/home/node/.openclaw/cases
+      - ${OPENCLAW_LOGS_DIR:-./logs}:/home/node/.openclaw/logs
+      # Own curated skill set (the point of this whole container).
+      - ${OPENCLAW_LOCAL_ANALYST_SKILLS_DIR:-./skills-local-analyst}:/home/node/.openclaw/skills
+      # Docker socket for the docker-in-docker wrappers (vol2/memprocfs/plaso).
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    # No ports published - only reached via `docker exec` from openclaw-gateway
+    # (see workspace/tools/delegate-to-local-analyst.sh), never from the host.
+    init: true
+    restart: unless-stopped
+    depends_on:
+      init-config-local:
+        condition: service_completed_successfully
+    command:
+      [
+        "gateway",
+        "--bind", "loopback",
+        "--port", "18789",
+        "--allow-unconfigured",
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD", "node", "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # ---------------------------------------------------------------------------
   # Gateway – the main OpenClaw process
@@ -59,6 +263,11 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_ORG_ID: ${OPENAI_ORG_ID:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # Local Ollama (runs on the host). The gateway's native ollama provider
+      # probes this URL to discover models; host.docker.internal reaches the
+      # host from inside the container. Ollama itself must bind 0.0.0.0:11434.
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
 
       # Claude web session (optional)
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
@@ -125,7 +334,7 @@ services:
     restart: unless-stopped
 
     depends_on:
-      init-perms:
+      init-config:
         condition: service_completed_successfully
 
     # Image ENTRYPOINT is already `node /app/dist/index.js`; just pass subcommand args.
