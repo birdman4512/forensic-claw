@@ -5,6 +5,7 @@
 
 # Runtime data created by the gateway / agent
 config/
+config-local-analyst/
 logs/
 workspace/.openclaw/
 

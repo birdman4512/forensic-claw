@@ -46,6 +46,21 @@ tools/run-nuclei-tool.sh -u https://target.example.com -o /cases/CASE-001/output
 
 `OPENCLAW_CASES_HOST_PATH` must be set to the **absolute host path** of `./cases` (the docker daemon resolves bind-mounts against the host filesystem, not against the gateway container). Example: `OPENCLAW_CASES_HOST_PATH=/home/you/forensic-claw/cases`.
 
+## Delegating to a local model
+
+For vol, vol2, memprocfs, tshark, pyshark, log2timeline.py, or psort.py,
+you can hand the whole sub-task (run the tool, read the output, answer a
+question) to `local-analyst` — a second, always-local agent — instead of
+running it yourself. Keeps large raw tool output and the reasoning about
+it out of your own context.
+
+```bash
+tools/delegate-to-local-analyst.sh "<task message>" [timeout-seconds]
+```
+
+See [`skills/delegate-to-local-analyst/SKILL.md`](../../skills/delegate-to-local-analyst/SKILL.md)
+and [`docs/local-analyst-delegation.md`](../../docs/local-analyst-delegation.md).
+
 ## Case helper
 
 Create a standard case scaffold from templates (in-image, no docker socket needed):

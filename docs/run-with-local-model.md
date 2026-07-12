@@ -172,6 +172,17 @@ a good moment to remove cloud keys you no longer need.
 
 ---
 
+## Delegating specific sub-tasks to a local model (even on cloud)
+
+You don't have to run the whole agent locally to use a local model. A
+second, always-local agent (`local-analyst`) can run heavy/verbose tools
+(Volatility, MemProcFS, tshark/pyshark, Plaso) and answer questions about
+their output on its own — useful even when your main agent is a cloud
+model, to keep frontier tokens off large raw tool dumps. See
+[`docs/local-analyst-delegation.md`](local-analyst-delegation.md).
+
+---
+
 ### Sources
 - [Ollama model library](https://ollama.com/library) — check a model's **Tools** capability before using it.
 - [Ollama OpenAI-compatible API](https://github.com/ollama/ollama/blob/main/docs/openai.md)
