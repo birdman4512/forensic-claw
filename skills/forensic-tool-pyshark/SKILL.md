@@ -5,7 +5,15 @@ description: Use pyshark in Forensic Claw for lawful DFIR, cyber security, evide
 
 # forensic-tool-pyshark
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Output can be verbose. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself:
+
+```bash
+tools/delegate-to-local-analyst.sh \
+  "Run tools/run-forensic-tool.sh pyshark <args>. Report suspicious connections/protocols and a one-line summary." \
+  600
+```
+
+Run it yourself only when you need to inspect exact raw output, need a fast turnaround, or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command), from the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-forensic-tool.sh pyshark [args...]

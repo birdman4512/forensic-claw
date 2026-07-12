@@ -5,7 +5,15 @@ description: Use vol in Forensic Claw for lawful DFIR, cyber security, evidence 
 
 # forensic-tool-vol
 
-Always invoke this tool through the Forensic Claw wrapper (the wrapper auto-logs the command). From the workspace `/home/node/.openclaw/workspace`:
+Volatility 3 output is usually verbose. **Prefer delegating to `local-analyst`** (see `skills/delegate-to-local-analyst/SKILL.md`) rather than running it yourself — it keeps large raw output and the tokens spent reading it out of your context:
+
+```bash
+tools/delegate-to-local-analyst.sh \
+  "Run tools/run-forensic-tool.sh vol -f <evidence-path> windows.pslist. Report suspicious/unexpected processes and a one-line summary." \
+  600
+```
+
+Run it yourself only when you need to inspect exact raw output, need a fast turnaround (delegation takes minutes on CPU), or the question is more exploratory than a single bounded ask. Direct invocation, through the Forensic Claw wrapper (auto-logs the command), from the workspace `/home/node/.openclaw/workspace`:
 
 ```bash
 tools/run-forensic-tool.sh vol [args...]
